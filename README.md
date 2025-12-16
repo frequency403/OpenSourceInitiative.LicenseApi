@@ -130,7 +130,7 @@
  ## Build, test, and CI
  * Build locally: `dotnet build -c Release`
  * Run tests: `dotnet test -c Release`
- * CI: GitHub Actions builds on Ubuntu, Windows, and macOS with .NET SDK 9 and 10, runs tests with line coverage threshold ≥ 90% and uploads Cobertura coverage artifacts.
+ * CI: GitHub Actions builds on Ubuntu, Windows, and macOS with .NET SDK 9 and 10, runs tests with line coverage threshold and uploads Cobertura coverage artifacts.
 
  Some integration tests hit the live OSI API (see `OpenSourceInitiative.LicenseApi.Tests/Integration`). They are decorated to run only when the API is reachable.
 
