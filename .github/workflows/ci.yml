@@ -15,7 +15,7 @@ jobs:
         dotnet: [ '9.0.x', '10.0.x' ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK ${{ matrix.dotnet }}
         uses: actions/setup-dotnet@v4
