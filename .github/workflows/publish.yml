@@ -14,7 +14,7 @@ jobs:
     if: |
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      startsWith(github.event.workflow_run.head_branch, 'v')
+      github.event.workflow_run.head_branch =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
