@@ -43,10 +43,14 @@ jobs:
       - name: Restore
         run: dotnet restore
 
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
       - name: Pack Core package
         run: >-
           dotnet pack OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj
           -c Release -o ./nupkg
+          --no-build
           -p:PackageVersion=${{ env.VERSION }}
           -p:ContinuousIntegrationBuild=true
 
@@ -54,6 +58,7 @@ jobs:
         run: >-
           dotnet pack OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj
           -c Release -o ./nupkg
+          --no-build
           -p:PackageVersion=${{ env.VERSION }}
           -p:ContinuousIntegrationBuild=true
 
