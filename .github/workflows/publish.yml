@@ -8,16 +8,19 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       - 'v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+'
 
+permissions:
+  contents: write
+
 jobs:
   pack-and-publish:
     if: github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -62,3 +65,14 @@ jobs:
           --api-key "$NUGET_API_KEY"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+      - name: Create GitHub Release and upload packages
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          prerelease: ${{ contains(env.VERSION, '-beta.') }}
+          generate_release_notes: true
+          files: |
+            nupkg/*.nupkg

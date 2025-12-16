@@ -15,10 +15,10 @@ jobs:
         dotnet: [ '9.0.x', '10.0.x' ]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup .NET SDK ${{ matrix.dotnet }}
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: ${{ matrix.dotnet }}
           cache: true
@@ -42,11 +42,11 @@ jobs:
           /p:CoverletOutputFormat=cobertura
           /p:Threshold=90
           /p:ThresholdType=line
-          /p:ExcludeByFile="**/bin/**;**/obj/**"
+          /p:ExcludeByFile="**/bin/**%3B**/obj/**"
 
       - name: Upload coverage (cobertura)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.dotnet }}
           path: |
