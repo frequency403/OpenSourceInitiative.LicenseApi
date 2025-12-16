@@ -9,6 +9,7 @@ using System.Text.Json;
 using OpenSourceInitiative.LicenseApi.Extensions;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Reflection;
 using OpenSourceInitiative.LicenseApi.Converter;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
@@ -439,10 +440,11 @@ public class OsiLicensesClient : IOsiLicensesClient
         {
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
-
         if (client.DefaultRequestHeaders.UserAgent == null || client.DefaultRequestHeaders.UserAgent.Count == 0)
         {
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative.LicenseApi.Client"));
+            var assembly = Assembly.GetExecutingAssembly();
+            var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", version));
         }
     }
 }

@@ -45,7 +45,9 @@ public static class ServiceCollectionExtensions
             }
             if (client.DefaultRequestHeaders.UserAgent == null || client.DefaultRequestHeaders.UserAgent.Count == 0)
             {
-                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative.LicenseApi.Client"));
+                var assembly = Assembly.GetExecutingAssembly();
+                var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", version));
             }
         });
 
