@@ -7,6 +7,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 #endif
 using OpenSourceInitiative.LicenseApi.Extensions;
+using System.Net;
+using System.Net.Http.Headers;
 using OpenSourceInitiative.LicenseApi.Converter;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
@@ -55,6 +57,7 @@ public class OsiLicensesClient : IOsiLicensesClient
     public OsiLicensesClient()
     {
         _httpClient = new HttpClient { BaseAddress = new Uri(ApiBase) };
+        EnsureDefaultHeaders(_httpClient);
         _ownsHttpClient = true;
     }
 
@@ -70,6 +73,7 @@ public class OsiLicensesClient : IOsiLicensesClient
         {
             _httpClient.BaseAddress = new Uri(ApiBase);
         }
+        EnsureDefaultHeaders(_httpClient);
     }
 
     /// <inheritdoc />
@@ -368,9 +372,8 @@ public class OsiLicensesClient : IOsiLicensesClient
         // Enrich with license text in parallel (bounded)
         var throttler = new SemaphoreSlim(Math.Max(2, Environment.ProcessorCount));
         var tasks = new List<Task>();
-        foreach (var lic in list)
+        foreach (var lic in list.Where(lic => string.IsNullOrWhiteSpace(lic.LicenseText)))
         {
-            if (!string.IsNullOrWhiteSpace(lic.LicenseText)) continue;
             await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
             tasks.Add(Task.Run(async () =>
             {
@@ -429,5 +432,17 @@ public class OsiLicensesClient : IOsiLicensesClient
         }
     }
 
-    
+    private static void EnsureDefaultHeaders(HttpClient client)
+    {
+        // Accept JSON by default
+        if (client.DefaultRequestHeaders.Accept.Count == 0)
+        {
+            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        }
+
+        if (client.DefaultRequestHeaders.UserAgent == null || client.DefaultRequestHeaders.UserAgent.Count == 0)
+        {
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative.LicenseApi.Client"));
+        }
+    }
 }

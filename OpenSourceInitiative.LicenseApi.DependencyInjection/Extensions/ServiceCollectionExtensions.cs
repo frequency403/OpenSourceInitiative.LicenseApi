@@ -1,4 +1,6 @@
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenSourceInitiative.LicenseApi.Clients;
@@ -34,6 +36,16 @@ public static class ServiceCollectionExtensions
             if (client.BaseAddress is null)
             {
                 client.BaseAddress = options.BaseAddress ?? new Uri("https://opensource.org/api/");
+            }
+
+            // Ensure sensible defaults for public API access
+            if (client.DefaultRequestHeaders.Accept.Count == 0)
+            {
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            }
+            if (client.DefaultRequestHeaders.UserAgent == null || client.DefaultRequestHeaders.UserAgent.Count == 0)
+            {
+                client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative.LicenseApi.Client"));
             }
         });
 
