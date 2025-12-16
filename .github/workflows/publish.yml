@@ -1,0 +1,63 @@
+name: Publish NuGet
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+'
+
+jobs:
+  pack-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Determine version from tag
+        shell: bash
+        run: |
+          REF="${GITHUB_REF_NAME:-${{ github.ref_name }}}"
+          VERSION="${REF#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Determined version: $VERSION"
+
+      - name: Validate SemVer (allow -beta.N)
+        shell: bash
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "Tag '$VERSION' is not a valid SemVer (allowing -beta.N)."
+            exit 1
+          fi
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Pack Core package
+        run: >-
+          dotnet pack OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj
+          -c Release -o ./nupkg
+          -p:PackageVersion=${{ env.VERSION }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Pack DI package
+        run: >-
+          dotnet pack OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj
+          -c Release -o ./nupkg
+          -p:PackageVersion=${{ env.VERSION }}
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Publish to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: >-
+          dotnet nuget push "./nupkg/*.nupkg"
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
