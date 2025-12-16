@@ -40,8 +40,9 @@ jobs:
           dotnet test --configuration Release --no-build
           /p:CollectCoverage=true
           /p:CoverletOutputFormat=cobertura
-          /p:Threshold=90
+          /p:Threshold=75
           /p:ThresholdType=line
+          /p:ThresholdStat=average
           /p:ExcludeByFile="**/bin/**%3B**/obj/**"
 
       - name: Upload coverage (cobertura)

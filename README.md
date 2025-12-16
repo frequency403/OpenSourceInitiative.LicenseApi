@@ -147,7 +147,7 @@
  Issues and pull requests are welcome. If you contribute, please:
  * Add or update tests
  * Keep code style consistent with the surrounding code
- * Ensure `dotnet test` passes (CI enforces coverage ≥ 90% lines)
+ * Ensure `dotnet test` passes (CI enforces coverage ≥ 75% lines)
 
  See also: [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
 
