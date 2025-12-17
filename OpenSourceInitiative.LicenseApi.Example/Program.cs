@@ -1,8 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenSourceInitiative.LicenseApi.Clients;
-using OpenSourceInitiative.LicenseApi.DependencyInjection.Extensions;
 using OpenSourceInitiative.LicenseApi.Enums;
+using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 
 Console.WriteLine("--- OpenSourceInitiative.LicenseApi Example ---\n");

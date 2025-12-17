@@ -20,6 +20,7 @@ public class OsiLicensesClientTests
     [Fact]
     public async Task GetAllLicensesAsync_ParsesAndPopulatesText()
     {
+        // Arrange
         var jsonArray = "[" + string.Join(',', new[]
         {
             // minimal valid entries; include html links for text extraction
@@ -55,29 +56,38 @@ public class OsiLicensesClientTests
         });
 
         await using var client = new OsiLicensesClient(httpClient);
+
+        // Act
         var result = await client.GetAllLicensesAsync();
 
-        Assert.NotEmpty(result);
+        // Assert
+        result.Should().NotBeEmpty();
         var mit = result.FirstOrDefault(x => x.SpdxId == "MIT");
         var ap2 = result.FirstOrDefault(x => x.SpdxId == "Apache-2.0");
-        Assert.NotNull(mit);
-        Assert.Equal("MIT Text", mit.LicenseText);
-        Assert.NotNull(ap2);
-        Assert.Equal("Apache 2.0 Text", ap2.LicenseText);
+        mit.Should().NotBeNull();
+        mit!.LicenseText.Should().Be("MIT Text");
+        ap2.Should().NotBeNull();
+        ap2!.LicenseText.Should().Be("Apache 2.0 Text");
     }
 
     [Fact]
     public async Task GetAllLicensesAsync_FailSafeOnServerError_ReturnsSnapshot()
     {
+        // Arrange
         var (httpClient, _) = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         await using var client = new OsiLicensesClient(httpClient);
+
+        // Act
         var result = await client.GetAllLicensesAsync();
-        Assert.Empty(result); // initial snapshot is empty
+
+        // Assert
+        result.Should().BeEmpty(); // initial snapshot is empty
     }
 
     [Fact]
     public async Task GetAllLicensesAsync_UsesCachedSnapshot_OnSubsequentCalls()
     {
+        // Arrange
         var (httpClient, handler) = CreateClient(req =>
         {
             if (req.RequestUri!.ToString() != ApiBase)
@@ -93,13 +103,13 @@ public class OsiLicensesClientTests
         });
 
         await using var client = new OsiLicensesClient(httpClient);
+
+        // Act
         var first = await client.GetAllLicensesAsync();
         var second = await client.GetAllLicensesAsync();
 
-        // Only one network call for the base list endpoint
-        // plus one for the html (which may be concurrent), but base should be once
-        Assert.True(handler.TotalCalls >= 1);
-        // Ensure data is the same instance snapshot and not refetched
-        Assert.Same(first, second);
+        // Assert
+        handler.TotalCalls.Should().BeGreaterThanOrEqualTo(1);
+        second.Should().BeSameAs(first);
     }
 }

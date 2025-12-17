@@ -6,10 +6,12 @@ namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class HttpClientExtensionsTests
 {
-    [Fact]
-    public async Task GetLicenseTextAsync_ExtractsText_FromHtml()
+    [Theory]
+    [InlineData("<html><body><div class='license-content'> Hello &amp; World </div></body></html>", "Hello & World")]
+    [InlineData("<html><body><div>NO CONTENT</div></body></html>", "")]
+    public async Task GetLicenseTextAsync_Parses_Text_Or_Empty(string html, string expected)
     {
-        var html = @"<html><body><div class='license-content'> Hello &amp; World </div></body></html>";
+        // Arrange
         using var http = new HttpClient(new StubHttpMessageHandler(_ => StubHttpMessageHandler.Html(html)));
         var lic = new OsiLicense
         {
@@ -17,22 +19,11 @@ public class HttpClientExtensionsTests
             Name = "X",
             Id = "x"
         };
-        var text = await http.GetLicenseTextAsync(lic);
-        Assert.Equal("Hello & World", text);
-    }
 
-    [Fact]
-    public async Task GetLicenseTextAsync_ReturnsEmpty_WhenNoContentNode()
-    {
-        var html = @"<html><body><div>NO CONTENT</div></body></html>";
-        using var http = new HttpClient(new StubHttpMessageHandler(_ => StubHttpMessageHandler.Html(html)));
-        var lic = new OsiLicense
-        {
-            Links = new OsiLicenseLinks { Html = new OsiHref { Href = "https://example.test/license" } },
-            Name = "X",
-            Id = "x"
-        };
+        // Act
         var text = await http.GetLicenseTextAsync(lic);
-        Assert.Equal(string.Empty, text);
+
+        // Assert
+        text.Should().Be(expected);
     }
 }

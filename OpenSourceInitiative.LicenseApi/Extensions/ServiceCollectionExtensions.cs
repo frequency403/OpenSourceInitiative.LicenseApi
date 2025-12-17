@@ -2,15 +2,15 @@ using System.Net.Http.Headers;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using OpenSourceInitiative.LicenseApi.Clients;
-using OpenSourceInitiative.LicenseApi.DependencyInjection.Options;
 using OpenSourceInitiative.LicenseApi.Interfaces;
+using OpenSourceInitiative.LicenseApi.Options;
 
-namespace OpenSourceInitiative.LicenseApi.DependencyInjection.Extensions;
+namespace OpenSourceInitiative.LicenseApi.Extensions;
 
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers <see cref="IOsiLicensesClient" /> as a typed client using <see cref="IHttpClientFactory" />.
+    ///     Registers <see cref="OpenSourceInitiative.LicenseApi.Interfaces.IOsiLicensesClient" /> as a typed client using <see cref="System.Net.Http.IHttpClientFactory" />.
     ///     Supports optional base address configuration and a custom primary handler.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -28,7 +28,7 @@ public static class ServiceCollectionExtensions
 
         var options = new OsiClientOptions();
         configure?.Invoke(options);
-
+        
         var builder = services.AddHttpClient<IOsiLicensesClient, OsiLicensesClient>(client =>
         {
             client.BaseAddress ??= options.BaseAddress;

@@ -1,0 +1,59 @@
+name: Create release tag on merge
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create SemVer tag (release/* -> main)
+    if: |
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create tag if missing
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const headRef = context.payload.pull_request.head.ref; // release/v1.2.3
+            const m = /^release\/(v\d+\.\d+\.\d+)$/.exec(headRef);
+            if (!m) {
+              core.setFailed(`Branch '${headRef}' must match 'release/vM.m.P' (e.g. release/v1.2.3)`);
+              return;
+            }
+
+            const tag = m[1]; // v1.2.3
+
+            // For squash merges, this is the new commit created on main:
+            const sha = context.payload.pull_request.merge_commit_sha;
+            if (!sha) {
+              core.setFailed("merge_commit_sha is missing; cannot create tag.");
+              return;
+            }
+
+            // Idempotent: if tag already exists, do nothing.
+            try {
+              await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+              core.info(`Tag '${tag}' already exists. Skipping.`);
+              return;
+            } catch (e) {
+              // expected if it doesn't exist
+            }
+
+            await github.rest.git.createRef({
+              owner,
+              repo,
+              ref: `refs/tags/${tag}`,
+              sha
+            });
+
+            core.info(`Created tag '${tag}' at ${sha}.`);

@@ -1,91 +1,52 @@
 name: Publish NuGet
 
 on:
-  pull_request:
-    types: [closed]
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
   pack-and-publish:
-    name: Pack & Publish (release -> main)
-    if: |
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.base.ref == 'main' &&
-      startsWith(github.event.pull_request.head.ref, 'release/v')
+    name: Pack & Publish (tag)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Resolve tag + ensure CI succeeded for release SHA
-        id: gate
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-
-            const releaseBranch = context.payload.pull_request.head.ref; // e.g. release/v1.2.3
-            const releaseSha = context.payload.pull_request.head.sha;
-
-            const m = /^release\/(v\d+\.\d+\.\d+)$/.exec(releaseBranch);
-            if (!m) {
-              core.setFailed(`Release branch '${releaseBranch}' does not match 'release/vX.Y.Z'`);
-              return;
-            }
-
-            const tag = m[1]; // vX.Y.Z
-
-            // 1) Verify that the tag exists and points EXACTLY to the release SHA
-            const refName = `tags/${tag}`;
-            let ref;
-            try {
-              ref = await github.rest.git.getRef({ owner, repo, ref: refName });
-            } catch (e) {
-              core.setFailed(`Expected tag '${tag}' was not found. Create tag '${tag}' on the release branch tip before merging.`);
-              return;
-            }
-
-            const tagSha = ref.data.object.sha;
-            if (tagSha !== releaseSha) {
-              core.setFailed(
-                `Tag '${tag}' points to ${tagSha}, but PR head is ${releaseSha}. ` +
-                `Tag must be created on the latest commit of '${releaseBranch}' before merge.`
-              );
-              return;
-            }
-
-            // 2) Verify CI workflow succeeded for that SHA (real dependency)
-            // NOTE: "CI" must match your workflow name.
-            const { data: runs } = await github.rest.actions.listWorkflowRunsForWorkflow({
-              owner,
-              repo,
-              workflow_id: "CI",
-              head_sha: releaseSha,
-              per_page: 20
-            });
-
-            const successful = runs.workflow_runs.find(r => r.conclusion === "success");
-            if (!successful) {
-              core.setFailed(`No successful CI run found for ${releaseSha}. Make sure CI ran and passed for the tagged release commit.`);
-              return;
-            }
-
-            core.info(`Gate OK: tag '${tag}' exists on release SHA and CI succeeded (run id ${successful.id}).`);
-            core.setOutput("tag", tag);
-            core.setOutput("version", tag.replace(/^v/, ""));
-
       - name: Checkout tag
         uses: actions/checkout@v6
         with:
-          ref: ${{ steps.gate.outputs.tag }}
           fetch-depth: 0
+
+      - name: Resolve version from tag + ensure tag is on main
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"     # vM.m.P
+          VERSION="${TAG#v}"           # M.m.P
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag '$TAG' is not SemVer (vM.m.P)."
+            exit 1
+          fi
+
+          # Ensure the tagged commit is reachable from main
+          git fetch origin main --tags --force
+          if ! git branch -r --contains HEAD | grep -qE 'origin/main$'; then
+            echo "Tagged commit is not contained in origin/main; refusing to publish."
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: "10.0.x"
 
       - name: Restore
         run: dotnet restore
@@ -96,14 +57,6 @@ jobs:
       - name: Pack Core package
         run: >-
           dotnet pack OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj
-          -c Release -o ./nupkg
-          --no-build
-          -p:PackageVersion=${{ steps.gate.outputs.version }}
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Pack DI package
-        run: >-
-          dotnet pack OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj
           -c Release -o ./nupkg
           --no-build
           -p:PackageVersion=${{ steps.gate.outputs.version }}
