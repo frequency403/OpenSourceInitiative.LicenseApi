@@ -10,6 +10,8 @@ using OpenSourceInitiative.LicenseApi.Extensions;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OpenSourceInitiative.LicenseApi.Converter;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
@@ -32,8 +34,10 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// The base address of the OSI API and the relative path for licenses.
     /// </summary>
     private const string ApiBase = "https://opensource.org/api/";
+
     private const string LicensesPath = "licenses";
-    
+
+    private readonly ILogger<OsiLicensesClient> _logger;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
     private readonly SemaphoreSlim _initGate = new(1, 1);
@@ -55,8 +59,10 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// <summary>
     /// Creates a client with its own <see cref="HttpClient"/> pointing to the OSI API base URL.
     /// </summary>
-    public OsiLicensesClient()
+    /// <param name="logger">Optional logger instance.</param>   
+    public OsiLicensesClient(ILogger<OsiLicensesClient>? logger = null)
     {
+        _logger = logger ?? NullLogger<OsiLicensesClient>.Instance;
         _httpClient = new HttpClient { BaseAddress = new Uri(ApiBase) };
         EnsureDefaultHeaders(_httpClient);
         _ownsHttpClient = true;
@@ -66,14 +72,13 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// Creates a client that uses the provided <paramref name="httpClient"/> (not disposed by this instance).
     /// </summary>
     /// <param name="httpClient">Configured HTTP client. If <see cref="HttpClient.BaseAddress"/> is null, it will be set to the OSI API base.</param>
-    public OsiLicensesClient(HttpClient httpClient)
+    /// <param name="logger">Optional logger instance.</param> 
+    public OsiLicensesClient(HttpClient httpClient, ILogger<OsiLicensesClient>? logger = null)
     {
+        _logger = logger ?? NullLogger<OsiLicensesClient>.Instance;
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _ownsHttpClient = false;
-        if (_httpClient.BaseAddress is null)
-        {
-            _httpClient.BaseAddress = new Uri(ApiBase);
-        }
+        _httpClient.BaseAddress ??= new Uri(ApiBase);
         EnsureDefaultHeaders(_httpClient);
     }
 
@@ -81,12 +86,26 @@ public class OsiLicensesClient : IOsiLicensesClient
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (_initialized) return;
+
+        _logger.LogDebug("Acquiring initialization lock");
         await _initGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_initialized) return;
+            if (_initialized)
+            {
+                _logger.LogDebug("Already initialized, skipping");
+                return;
+            }
+
+            _logger.LogInformation("Initializing OsiLicensesClient");
             await GetAllLicensesAsync(cancellationToken).ConfigureAwait(false);
             _initialized = true;
+            _logger.LogInformation("OsiLicensesClient initialization completed successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to initialize OsiLicensesClient");
+            throw;
         }
         finally
         {
@@ -97,19 +116,29 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// <inheritdoc />
     public void Initialize()
     {
+        _logger.LogDebug("Starting synchronous initialization");
         InitializeAsync().GetAwaiter().GetResult();
     }
+
 #if NET10_0_OR_GREATER
     /// <inheritdoc />
     public async Task<IReadOnlyList<OsiLicense>> GetAllLicensesAsync(CancellationToken cancellationToken = default)
     {
         // Fast path: if already populated and not cancelled, return snapshot
-        if (_snapshot.Count > 0) return _snapshot;
+        if (_snapshot.Count > 0)
+        {
+            _logger.LogDebug("Returning cached snapshot of {Count} licenses", _snapshot.Count);
+            return _snapshot;
+        }
+
+        _logger.LogInformation("Fetching all licenses from OSI API");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
 
         // Stream the licenses list and then fetch texts concurrently (bounded)
         var list = new List<OsiLicense>(capacity: 256);
         try
         {
+            _logger.LogDebug("Starting streaming deserialization from {Path}", LicensesPath);
             await foreach (var license in _httpClient.GetFromJsonAsAsyncEnumerable<OsiLicense>(
                                LicensesPath, cancellationToken))
             {
@@ -118,21 +147,28 @@ public class OsiLicensesClient : IOsiLicensesClient
                 // Add without text first; text fetched in parallel later
                 _licenses.AddOrUpdate(key, license, (_, _) => license);
             }
+
+            _logger.LogDebug("Streaming deserialization completed, loaded {Count} licenses", _licenses.Count);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Streaming deserialization failed, falling back to array deserialization");
             // Ignore streaming errors; attempt JSON array fallback below
         }
 
         // Fallback: if streaming returned nothing, try parsing as a JSON array
         if (_licenses.IsEmpty)
         {
+            _logger.LogDebug("Attempting fallback array deserialization");
             try
             {
-                using var stream = await _httpClient.GetStreamAsync(LicensesPath, cancellationToken).ConfigureAwait(false);
-                var arr = await System.Text.Json.JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+                using var stream =
+                    await _httpClient.GetStreamAsync(LicensesPath, cancellationToken).ConfigureAwait(false);
+                var arr = await System.Text.Json.JsonSerializer
+                    .DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
                 if (arr is not null)
                 {
+                    _logger.LogDebug("Fallback deserialization successful, processing {Count} licenses", arr.Length);
                     foreach (var lic in arr)
                     {
                         if (lic is null) continue;
@@ -141,19 +177,24 @@ public class OsiLicensesClient : IOsiLicensesClient
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Fallback deserialization failed");
                 // still fail-safe; leave dictionary empty
             }
         }
 
         // Bounded parallelism for fetching license texts
-        var throttler = new SemaphoreSlim(Math.Max(2, Environment.ProcessorCount));
+        var maxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount);
+        _logger.LogDebug("Fetching license texts with max parallelism of {MaxParallelism}", maxDegreeOfParallelism);
+        var throttler = new SemaphoreSlim(maxDegreeOfParallelism);
         var tasks = new List<Task>();
+        var textFetchCount = 0;
         foreach (var kvp in _licenses)
         {
             var license = kvp.Value;
             if (!string.IsNullOrWhiteSpace(license.LicenseText)) continue;
+            textFetchCount++;
             await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
             tasks.Add(Task.Run(async () =>
             {
@@ -163,8 +204,10 @@ public class OsiLicensesClient : IOsiLicensesClient
                     var text = await _httpClient.GetLicenseTextAsync(license, cancellationToken).ConfigureAwait(false);
                     license.LicenseText = text;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "Failed to fetch license text for {LicenseName} (SPDX: {SpdxId})",
+                        license.Name, license.SpdxId);
                     // keep going; leave LicenseText as null on failure
                 }
                 finally
@@ -174,54 +217,81 @@ public class OsiLicensesClient : IOsiLicensesClient
             }, cancellationToken));
         }
 
+        _logger.LogDebug("Initiated {Count} license text fetch operations", textFetchCount);
+
         try
         {
             await Task.WhenAll(tasks).ConfigureAwait(false);
+            _logger.LogDebug("All license text fetch operations completed");
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Some license text fetch operations failed");
             // Ignore aggregate exceptions from cancelled tasks; fail-safe behavior
         }
 
         list.AddRange(_licenses.Values);
         // Sort for deterministic order (by SPDX id if available, else by name)
-        list.Sort(static (a, b) => string.Compare(a.SpdxId ?? a.Name, b.SpdxId ?? b.Name, StringComparison.OrdinalIgnoreCase));
+        list.Sort(static (a, b) =>
+            string.Compare(a.SpdxId ?? a.Name, b.SpdxId ?? b.Name, StringComparison.OrdinalIgnoreCase));
         Licenses = list;
+
+        sw.Stop();
+        _logger.LogInformation("Successfully loaded {Count} licenses in {ElapsedMs} ms", _snapshot.Count,
+            sw.ElapsedMilliseconds);
         return _snapshot;
     }
 #else
     /// <inheritdoc />
     public async Task<IReadOnlyList<OsiLicense>> GetAllLicensesAsync(CancellationToken cancellationToken = default)
     {
-        if (_snapshot.Count > 0) return _snapshot;
+        if (_snapshot.Count > 0)
+        {
+            _logger.LogDebug("Returning cached snapshot of {Count} licenses", _snapshot.Count);
+            return _snapshot;
+        }
+        
+        _logger.LogInformation("Fetching all licenses from OSI API");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        
         OsiLicense[]? licensesWithoutText;
         try
         {
+            _logger.LogDebug("Fetching licenses from {Path}", LicensesPath);
             using var stream = await _httpClient.GetStreamAsync(LicensesPath).ConfigureAwait(false);
-            licensesWithoutText = await JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            licensesWithoutText =
+ await JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            _logger.LogDebug("Deserialized {Count} licenses", licensesWithoutText?.Length ?? 0);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to fetch or deserialize licenses from API");
             return _snapshot; // fail-safe
         }
 
         if (licensesWithoutText is null || licensesWithoutText.Length == 0)
+        {
+            _logger.LogWarning("No licenses returned from API");
             return _snapshot;
+        }
 
         foreach (var license in licensesWithoutText)
         {
-            if (license is null) continue;
             if (!TryGetLicenseKey(license, out var key)) continue;
             _licenses.AddOrUpdate(key, license, (_, _) => license);
         }
 
         // Bounded parallelism
-        var throttler = new SemaphoreSlim(Math.Max(2, Environment.ProcessorCount));
+        var maxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount);
+        _logger.LogDebug("Fetching license texts with max parallelism of {MaxParallelism}", maxDegreeOfParallelism);
+        using var throttler = new SemaphoreSlim(maxDegreeOfParallelism);
         var tasks = new List<Task>();
+        var textFetchCount = 0;
         foreach (var kvp in _licenses)
         {
             var license = kvp.Value;
             if (!string.IsNullOrWhiteSpace(license.LicenseText)) continue;
+            textFetchCount++;
             await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
             tasks.Add(Task.Run(async () =>
             {
@@ -230,8 +300,9 @@ public class OsiLicensesClient : IOsiLicensesClient
                     var text = await _httpClient.GetLicenseTextAsync(license, cancellationToken).ConfigureAwait(false);
                     license.LicenseText = text;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    _logger.LogWarning(ex, "Failed to fetch license text for {LicenseName} (SPDX: {SpdxId})", license.Name, license.SpdxId);
                     // ignore per-item failure
                 }
                 finally
@@ -241,12 +312,25 @@ public class OsiLicensesClient : IOsiLicensesClient
             }, cancellationToken));
         }
 
-        try { await Task.WhenAll(tasks).ConfigureAwait(false); }
-        catch { /* ignore */ }
+        _logger.LogDebug("Initiated {Count} license text fetch operations", textFetchCount);
+
+        try 
+        { 
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            _logger.LogDebug("All license text fetch operations completed");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Some license text fetch operations failed");
+            /* ignore */ 
+        }
 
         var list = _licenses.Values.ToList();
         list.Sort(static (a, b) => string.Compare(a.SpdxId ?? a.Name, b.SpdxId ?? b.Name, StringComparison.OrdinalIgnoreCase));
         Licenses = list;
+        
+        sw.Stop();
+        _logger.LogInformation("Successfully loaded {Count} licenses in {ElapsedMs} ms", _snapshot.Count, sw.ElapsedMilliseconds);
         return _snapshot;
     }
 #endif
@@ -256,15 +340,25 @@ public class OsiLicensesClient : IOsiLicensesClient
         => GetAllLicensesAsync().GetAwaiter().GetResult();
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<OsiLicense>> SearchAsync(string query, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<OsiLicense>> SearchAsync(string query,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(query)) return Array.Empty<OsiLicense>();
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            _logger.LogDebug("Search called with empty query, returning empty result");
+            return Array.Empty<OsiLicense>();
+        }
+
+        _logger.LogDebug("Searching for licenses matching query: '{Query}'", query);
         await GetAllLicensesAsync(cancellationToken).ConfigureAwait(false);
         var q = query.Trim();
-        return _snapshot.Where(l =>
+        var results = _snapshot.Where(l =>
                 (!string.IsNullOrEmpty(l.Name) && l.Name.Contains(q, StringComparison.OrdinalIgnoreCase)) ||
                 (!string.IsNullOrEmpty(l.Id) && l.Id.Contains(q, StringComparison.OrdinalIgnoreCase)))
             .ToArray();
+
+        _logger.LogInformation("Search for '{Query}' returned {Count} result(s)", query, results.Length);
+        return results;
     }
 
     /// <inheritdoc />
@@ -274,12 +368,33 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// <inheritdoc />
     public async Task<OsiLicense?> GetBySpdxAsync(string spdxId, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(spdxId)) return null;
+        if (string.IsNullOrWhiteSpace(spdxId))
+        {
+            _logger.LogDebug("GetBySpdx called with empty SPDX ID");
+            return null;
+        }
+
+        _logger.LogDebug("Looking up license by SPDX ID: '{SpdxId}'", spdxId);
         await GetAllLicensesAsync(cancellationToken).ConfigureAwait(false);
         // Try fast path via dictionary (keys prefer SPDX when available)
-        if (_licenses.TryGetValue(spdxId, out var lic)) return lic;
+        if (_licenses.TryGetValue(spdxId, out var lic))
+        {
+            _logger.LogDebug("Found license '{LicenseName}' via dictionary lookup", lic.Name);
+            return lic;
+        }
+
         // Fallback scan
-        return _snapshot.FirstOrDefault(l => string.Equals(l.SpdxId, spdxId, StringComparison.OrdinalIgnoreCase));
+        var result = _snapshot.FirstOrDefault(l => string.Equals(l.SpdxId, spdxId, StringComparison.OrdinalIgnoreCase));
+        if (result != null)
+        {
+            _logger.LogDebug("Found license '{LicenseName}' via fallback scan", result.Name);
+        }
+        else
+        {
+            _logger.LogInformation("License with SPDX ID '{SpdxId}' not found", spdxId);
+        }
+
+        return result;
     }
 
     /// <inheritdoc />
@@ -287,23 +402,28 @@ public class OsiLicensesClient : IOsiLicensesClient
         => GetBySpdxAsync(spdxId).GetAwaiter().GetResult();
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<OsiLicense>> GetLicensesByNameAsync(string name, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<OsiLicense>> GetLicensesByNameAsync(string name,
+        CancellationToken cancellationToken = default)
         => FetchFilteredAsync("name", name, cancellationToken);
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<OsiLicense>> GetLicensesByKeywordAsync(string keyword, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<OsiLicense>> GetLicensesByKeywordAsync(string keyword,
+        CancellationToken cancellationToken = default)
         => FetchFilteredAsync("keyword", keyword, cancellationToken);
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<OsiLicense>> GetLicensesByKeywordAsync(OsiLicenseKeyword keyword, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<OsiLicense>> GetLicensesByKeywordAsync(OsiLicenseKeyword keyword,
+        CancellationToken cancellationToken = default)
         => FetchFilteredAsync("keyword", OsiLicenseKeywordMapping.ToApiValue(keyword), cancellationToken);
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<OsiLicense>> GetLicensesByStewardAsync(string steward, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<OsiLicense>> GetLicensesByStewardAsync(string steward,
+        CancellationToken cancellationToken = default)
         => FetchFilteredAsync("steward", steward, cancellationToken);
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<OsiLicense>> GetLicensesBySpdxPatternAsync(string spdxPattern, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<OsiLicense>> GetLicensesBySpdxPatternAsync(string spdxPattern,
+        CancellationToken cancellationToken = default)
         => FetchFilteredAsync("spdx", spdxPattern, cancellationToken);
 
     /// <inheritdoc />
@@ -326,16 +446,28 @@ public class OsiLicensesClient : IOsiLicensesClient
     public IReadOnlyList<OsiLicense> GetLicensesBySpdxPattern(string spdxPattern)
         => GetLicensesBySpdxPatternAsync(spdxPattern).GetAwaiter().GetResult();
 
-    private async Task<IReadOnlyList<OsiLicense>> FetchFilteredAsync(string paramName, string paramValue, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<OsiLicense>> FetchFilteredAsync(string paramName, string paramValue,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(paramValue)) return Array.Empty<OsiLicense>();
+        if (string.IsNullOrWhiteSpace(paramValue))
+        {
+            _logger.LogDebug("FetchFiltered called with empty value for parameter '{ParamName}'", paramName);
+            return Array.Empty<OsiLicense>();
+        }
+
+        _logger.LogDebug("Fetching licenses filtered by {ParamName}='{ParamValue}'", paramName, paramValue);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
         string encoded = Uri.EscapeDataString(paramValue);
         if (string.Equals(paramName, "spdx", StringComparison.OrdinalIgnoreCase))
         {
             // Preserve '*' wildcard per API spec
             encoded = encoded.Replace("%2A", "*");
         }
+
         var request = $"{LicensesPath}?{paramName}={encoded}";
+        _logger.LogDebug("Request URL: {RequestUrl}", request);
+
         OsiLicense[]? items;
         try
         {
@@ -345,18 +477,26 @@ public class OsiLicensesClient : IOsiLicensesClient
 #endif
             ).ConfigureAwait(false);
 #if NET10_0_OR_GREATER
-            items = await System.Text.Json.JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            items = await System.Text.Json.JsonSerializer
+                .DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
 #else
-            items = await JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            items =
+ await JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
 #endif
+            _logger.LogDebug("Deserialized {Count} filtered licenses", items?.Length ?? 0);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "Failed to fetch filtered licenses by {ParamName}='{ParamValue}'", paramName,
+                paramValue);
             return Array.Empty<OsiLicense>();
         }
 
         if (items is null || items.Length == 0)
+        {
+            _logger.LogInformation("No licenses found for {ParamName}='{ParamValue}'", paramName, paramValue);
             return Array.Empty<OsiLicense>();
+        }
 
         // Map into a temp list and enrich with license text
         var list = new List<OsiLicense>(items.Length);
@@ -367,14 +507,20 @@ public class OsiLicensesClient : IOsiLicensesClient
             {
                 _licenses.AddOrUpdate(key!, license, (_, _) => license);
             }
+
             list.Add(license);
         }
 
         // Enrich with license text in parallel (bounded)
-        var throttler = new SemaphoreSlim(Math.Max(2, Environment.ProcessorCount));
+        var maxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount);
+        _logger.LogDebug("Enriching {Count} filtered licenses with text (max parallelism: {MaxParallelism})",
+            list.Count, maxDegreeOfParallelism);
+        using var throttler = new SemaphoreSlim(maxDegreeOfParallelism);
         var tasks = new List<Task>();
+        var textFetchCount = 0;
         foreach (var lic in list.Where(lic => string.IsNullOrWhiteSpace(lic.LicenseText)))
         {
+            textFetchCount++;
             await throttler.WaitAsync(cancellationToken).ConfigureAwait(false);
             tasks.Add(Task.Run(async () =>
             {
@@ -383,16 +529,41 @@ public class OsiLicensesClient : IOsiLicensesClient
                     var text = await _httpClient.GetLicenseTextAsync(lic, cancellationToken).ConfigureAwait(false);
                     lic.LicenseText = text;
                 }
-                catch { /* fail-safe per item */ }
-                finally { throttler.Release(); }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to fetch license text for {LicenseName} (SPDX: {SpdxId})", lic.Name,
+                        lic.SpdxId);
+                    /* fail-safe per item */
+                }
+                finally
+                {
+                    throttler.Release();
+                }
             }, cancellationToken));
         }
 
-        try { await Task.WhenAll(tasks).ConfigureAwait(false); }
-        catch { /* ignore */ }
+        _logger.LogDebug("Initiated {Count} license text fetch operations for filtered results", textFetchCount);
+
+        try
+        {
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            _logger.LogDebug("All license text fetch operations completed for filtered results");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Some license text fetch operations failed for filtered results");
+            /* ignore */
+        }
 
         // Deterministic order
-        list.Sort(static (a, b) => string.Compare(a.SpdxId ?? a.Name, b.SpdxId ?? b.Name, StringComparison.OrdinalIgnoreCase));
+        list.Sort(static (a, b) =>
+            string.Compare(a.SpdxId ?? a.Name, b.SpdxId ?? b.Name, StringComparison.OrdinalIgnoreCase));
+
+        sw.Stop();
+        _logger.LogInformation(
+            "Fetched and enriched {Count} licenses filtered by {ParamName}='{ParamValue}' in {ElapsedMs} ms",
+            list.Count, paramName, paramValue, sw.ElapsedMilliseconds);
+
         return list;
     }
 
@@ -407,17 +578,21 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// <inheritdoc />
     public void Dispose()
     {
+        _logger.LogDebug("Disposing OsiLicensesClient");
         GC.SuppressFinalize(this);
         if (_ownsHttpClient)
         {
             _httpClient.Dispose();
+            _logger.LogDebug("Disposed owned HttpClient");
         }
+
         _initGate.Dispose();
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        _logger.LogDebug("Disposing OsiLicensesClient asynchronously");
         GC.SuppressFinalize(this);
         try
         {
@@ -428,7 +603,9 @@ public class OsiLicensesClient : IOsiLicensesClient
             if (_ownsHttpClient)
             {
                 _httpClient.Dispose();
+                _logger.LogDebug("Disposed owned HttpClient");
             }
+
             await Task.CompletedTask;
         }
     }
@@ -440,11 +617,13 @@ public class OsiLicensesClient : IOsiLicensesClient
         {
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
+
         if (client.DefaultRequestHeaders.UserAgent == null || client.DefaultRequestHeaders.UserAgent.Count == 0)
         {
             var assembly = Assembly.GetExecutingAssembly();
             var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
-            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", version));
+            client.DefaultRequestHeaders.UserAgent.Add(
+                new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", version));
         }
     }
 }
