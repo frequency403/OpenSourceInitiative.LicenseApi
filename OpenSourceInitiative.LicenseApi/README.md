@@ -3,6 +3,7 @@
 Lightweight, resilient client for the Open Source Initiative (OSI) License API.
 
 Highlights:
+
 - Fetches the OSI license catalog and extracts human‑readable license text from the HTML pages
 - In‑memory, thread‑safe cache with fail‑safe behavior (returns last snapshot on network errors)
 - Search by name or id and lookup by SPDX identifier
@@ -36,7 +37,8 @@ var mitAsync = await client.GetBySpdxAsync("MIT");
 
 Dependency Injection (recommended):
 
-Use the companion package `OpenSourceInitiative.LicenseApi.DependencyInjection` to register the client as a typed HTTP client.
+Use the companion package `OpenSourceInitiative.LicenseApi.DependencyInjection` to register the client as a typed HTTP
+client.
 
 ```bash
 dotnet add package OpenSourceInitiative.LicenseApi.DependencyInjection
@@ -52,7 +54,6 @@ services.AddLogging();
 services.AddOsiLicensesClient(o =>
 {
     // o.BaseAddress = new Uri("https://opensource.org/api/license");
-    o.EnableLogging = true; // adds a lightweight logging handler
 });
 
 await using var provider = services.BuildServiceProvider();

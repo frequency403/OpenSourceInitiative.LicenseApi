@@ -5,11 +5,11 @@ using System.Text.Json.Serialization;
 namespace OpenSourceInitiative.LicenseApi.Converter;
 
 /// <summary>
-/// JSON converter for optional <see cref="DateTime"/> values encoded in the OSI format "yyyyMMdd".
+///     JSON converter for optional <see cref="DateTime" /> values encoded in the OSI format "yyyyMMdd".
 /// </summary>
 /// <remarks>
-/// The OSI API encodes dates such as submission date and approval date using the compact pattern yyyyMMdd.
-/// This converter reads that representation as nullable <see cref="DateTime"/> and writes the same format.
+///     The OSI API encodes dates such as submission date and approval date using the compact pattern yyyyMMdd.
+///     This converter reads that representation as nullable <see cref="DateTime" /> and writes the same format.
 /// </remarks>
 public class CustomFormatDateTimeConverter : JsonConverter<DateTime?>
 {
@@ -25,10 +25,10 @@ public class CustomFormatDateTimeConverter : JsonConverter<DateTime?>
         if (string.IsNullOrEmpty(dateString))
             return null;
 
-        if (DateTime.TryParseExact(dateString, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
-            return date;
-
-        throw new JsonException($"Unable to parse '{dateString}' as date in format {DateFormat}");
+        return DateTime.TryParseExact(dateString, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None,
+            out var date)
+            ? date
+            : throw new JsonException($"Unable to parse '{dateString}' as date in format {DateFormat}");
     }
 
     /// <inheritdoc />

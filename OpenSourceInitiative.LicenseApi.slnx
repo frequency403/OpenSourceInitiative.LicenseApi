@@ -1,14 +1,16 @@
 <Solution>
-  <Project Path="OpenSourceInitiative.LicenseApi.Tests/OpenSourceInitiative.LicenseApi.Tests.csproj" />
-  <Project Path="OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj" />
-  <Folder Name="/Solution Items/">
-    <File Path=".github\workflows\ci.yml" />
-    <File Path=".github\workflows\publish.yml" />
-    <File Path="CODE_OF_CONDUCT.md" />
-    <File Path="Directory.Build.props" />
-    <File Path="LICENSE" />
-    <File Path="README.md" />
-  </Folder>
-  <Project Path="OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj" />
-  <Project Path="OpenSourceInitiative.LicenseApi.Example/OpenSourceInitiative.LicenseApi.Example.csproj" />
+    <Project Path="OpenSourceInitiative.LicenseApi.Tests/OpenSourceInitiative.LicenseApi.Tests.csproj" />
+    <Project Path="OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj" />
+    <Folder Name="/Solution Items/">
+        <File Path=".github/workflows/ci.yml" />
+        <File Path=".github/workflows/publish.yml" />
+        <File Path=".github/workflows/qodana_code_quality.yml" />
+        <File Path=".github/workflows/codeql.yml" />
+        <File Path="CODE_OF_CONDUCT.md" />
+        <File Path="Directory.Build.props" />
+        <File Path="LICENSE" />
+        <File Path="README.md" />
+    </Folder>
+    <Project Path="OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj" />
+    <Project Path="OpenSourceInitiative.LicenseApi.Example/OpenSourceInitiative.LicenseApi.Example.csproj" />
 </Solution>

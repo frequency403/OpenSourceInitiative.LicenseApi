@@ -1,14 +1,13 @@
 using System.Net.Sockets;
-using Xunit;
 
 namespace OpenSourceInitiative.LicenseApi.Tests.Infrastructure;
 
 /// <summary>
-/// xUnit Fact that is automatically skipped when the live OSI API is unreachable.
+///     xUnit Fact that is automatically skipped when the live OSI API is unreachable.
 /// </summary>
 /// <remarks>
-/// <br />- Set environment variable OSI_API_TESTS=1 to force tests to run without reachability probe.
-/// <br />- The reachability probe uses a short timeout to avoid delaying other test runs.
+///     <br />- Set environment variable OSI_API_TESTS=1 to force tests to run without reachability probe.
+///     <br />- The reachability probe uses a short timeout to avoid delaying other test runs.
 /// </remarks>
 public sealed class OsiApiAvailableFactAttribute : FactAttribute
 {
@@ -19,10 +18,7 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
         try
         {
             var force = Environment.GetEnvironmentVariable("OSI_API_TESTS");
-            if (string.Equals(force, "1", StringComparison.Ordinal))
-            {
-                return; // do not skip; user opted in explicitly
-            }
+            if (string.Equals(force, "1", StringComparison.Ordinal)) return; // do not skip; user opted in explicitly
 
             // Quick TCP reachability check on port 443 to avoid HTTP stack overhead
             var host = new Uri(DefaultBaseUrl).Host;
@@ -33,6 +29,7 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
                 Skip = "Skipping: OSI API not reachable (timeout). Set OSI_API_TESTS=1 to force run.";
                 return;
             }
+
             tcp.EndConnect(result);
         }
         catch

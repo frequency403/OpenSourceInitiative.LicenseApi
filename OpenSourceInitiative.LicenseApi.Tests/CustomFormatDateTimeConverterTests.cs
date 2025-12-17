@@ -18,8 +18,8 @@ public class CustomFormatDateTimeConverterTests
 
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
         Assert.NotNull(lic);
-        Assert.Equal(new DateTime(2025, 2, 1), lic!.SubmissionDate);
-        Assert.Equal(new DateTime(2025, 3, 2), lic!.ApprovalDate);
+        Assert.Equal(new DateTime(2025, 2, 1), lic.SubmissionDate);
+        Assert.Equal(new DateTime(2025, 3, 2), lic.ApprovalDate);
     }
 
     [Fact]
@@ -35,7 +35,7 @@ public class CustomFormatDateTimeConverterTests
 
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
         Assert.NotNull(lic);
-        Assert.Null(lic!.SubmissionDate);
+        Assert.Null(lic.SubmissionDate);
         Assert.Null(lic.ApprovalDate);
     }
 }

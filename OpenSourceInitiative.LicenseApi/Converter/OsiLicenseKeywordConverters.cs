@@ -1,12 +1,12 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JetBrains.Annotations;
 using OpenSourceInitiative.LicenseApi.Enums;
-using OpenSourceInitiative.LicenseApi.Models;
 
 namespace OpenSourceInitiative.LicenseApi.Converter;
 
 /// <summary>
-/// Maps between <see cref="OsiLicenseKeyword"/> enum values and the OSI API string tokens.
+///     Maps between <see cref="OsiLicenseKeyword" /> enum values and the OSI API string tokens.
 /// </summary>
 internal static class OsiLicenseKeywordMapping
 {
@@ -20,28 +20,31 @@ internal static class OsiLicenseKeywordMapping
         [OsiLicenseKeyword.VoluntarilyRetired] = "voluntarily-retired",
         [OsiLicenseKeyword.RedundantWithMorePopular] = "redundant-with-more-popular",
         [OsiLicenseKeyword.OtherMiscellaneous] = "other-miscellaneous",
-        [OsiLicenseKeyword.Uncategorized] = "uncategorized",
+        [OsiLicenseKeyword.Uncategorized] = "uncategorized"
     };
 
     private static readonly Dictionary<string, OsiLicenseKeyword> FromToken = ToToken
         .ToDictionary(kv => kv.Value, kv => kv.Key, StringComparer.OrdinalIgnoreCase);
 
-    public static string ToApiValue(OsiLicenseKeyword keyword) => ToToken[keyword];
+    public static string ToApiValue(OsiLicenseKeyword keyword)
+    {
+        return ToToken[keyword];
+    }
 
     public static bool TryParse(string? token, out OsiLicenseKeyword value)
     {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            value = default;
-            return false;
-        }
-        return FromToken.TryGetValue(token, out value);
+        value = default;
+        return !string.IsNullOrWhiteSpace(token)
+#pragma warning disable CS8604 // Possible null reference argument - token is never null due to IsNullOrWhiteSpace check
+               && FromToken.TryGetValue(token, out value);
+#pragma warning restore CS8604
     }
 }
 
 /// <summary>
-/// JSON converter for a single <see cref="OsiLicenseKeyword"/> value.
+///     JSON converter for a single <see cref="OsiLicenseKeyword" /> value.
 /// </summary>
+[UsedImplicitly]
 public sealed class OsiLicenseKeywordConverter : JsonConverter<OsiLicenseKeyword>
 {
     public override OsiLicenseKeyword Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -59,11 +62,12 @@ public sealed class OsiLicenseKeywordConverter : JsonConverter<OsiLicenseKeyword
 }
 
 /// <summary>
-/// JSON converter for a list of <see cref="OsiLicenseKeyword"/> values.
+///     JSON converter for a list of <see cref="OsiLicenseKeyword" /> values.
 /// </summary>
-public sealed class OsiLicenseKeywordsConverter : JsonConverter<List<OsiLicenseKeyword>>
+public sealed class OsiLicenseKeywordsConverter : JsonConverter<IReadOnlyCollection<OsiLicenseKeyword>>
 {
-    public override List<OsiLicenseKeyword> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override IReadOnlyCollection<OsiLicenseKeyword> Read(ref Utf8JsonReader reader, Type typeToConvert,
+        JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.Null)
             return new List<OsiLicenseKeyword>();
@@ -79,30 +83,23 @@ public sealed class OsiLicenseKeywordsConverter : JsonConverter<List<OsiLicenseK
             if (reader.TokenType == JsonTokenType.String)
             {
                 var token = reader.GetString();
-                if (OsiLicenseKeywordMapping.TryParse(token, out var value))
-                {
-                    list.Add(value);
-                }
-                else
-                {
-                    // Unknown tokens are ignored for forward-compatibility
-                }
+                if (OsiLicenseKeywordMapping.TryParse(token, out var value)) list.Add(value);
+                // Unknown tokens are ignored for forward-compatibility
             }
             else
             {
                 throw new JsonException("Expected string tokens in keywords array");
             }
         }
-        return list;
+
+        return list.AsReadOnly();
     }
 
-    public override void Write(Utf8JsonWriter writer, List<OsiLicenseKeyword> value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, IReadOnlyCollection<OsiLicenseKeyword> value,
+        JsonSerializerOptions options)
     {
         writer.WriteStartArray();
-        foreach (var v in value)
-        {
-            writer.WriteStringValue(OsiLicenseKeywordMapping.ToApiValue(v));
-        }
+        foreach (var v in value) writer.WriteStringValue(OsiLicenseKeywordMapping.ToApiValue(v));
         writer.WriteEndArray();
     }
 }

@@ -5,8 +5,6 @@ namespace OpenSourceInitiative.LicenseApi.Tests.Integration;
 
 public class LiveApiTests
 {
-    private const string ApiBase = "https://opensource.org/api/license";
-
     [OsiApiAvailableFact]
     public async Task GetAllLicenses_Matches_Expectations()
     {
@@ -18,7 +16,7 @@ public class LiveApiTests
         // Spot check known SPDX identifiers likely to exist
         var mit = await client.GetBySpdxAsync("MIT");
         Assert.NotNull(mit);
-        Assert.False(string.IsNullOrWhiteSpace(mit!.Name));
+        Assert.False(string.IsNullOrWhiteSpace(mit.Name));
 
         // Search should return reasonable results
         var apache = await client.SearchAsync("Apache");
@@ -31,7 +29,7 @@ public class LiveApiTests
         await using var client = new OsiLicensesClient();
         var mit = await client.GetBySpdxAsync("MIT");
         Assert.NotNull(mit);
-        Assert.NotNull(mit!.LicenseText);
+        Assert.NotNull(mit.LicenseText);
         Assert.True(mit.LicenseText.Length > 0);
     }
 }

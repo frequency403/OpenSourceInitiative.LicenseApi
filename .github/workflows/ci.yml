@@ -2,11 +2,70 @@ name: CI
 
 on:
   push:
+    branches-ignore:
+      - main
+      - develop
+      - 'release/**'
   pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  guard:
+    name: Decide whether to run
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    
+    steps:
+      - name: Decide
+        id: decide
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // PR events: always run (because you explicitly want opened/updated/reopened)
+            if (context.eventName === "pull_request") {
+              core.setOutput("should_run", "true");
+              return;
+            }
+            
+            // Push event: run only if there is NO open PR for this branch
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            // Example: refs/heads/feature/foo => "feature/foo"
+            const branch = context.ref.replace("refs/heads/", "");
+            
+            // List open PRs with head = owner:branch
+            const head = `${owner}:${branch}`;
+            
+            const { data: prs } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              head
+            });
+            
+            if (prs.length > 0) {
+              core.info(`Open PR exists for branch '${branch}' (${prs.length} PR(s)). Skipping push run.`);
+              core.setOutput("should_run", "false");
+              return;
+            }
+            
+            core.info(`No open PR for branch '${branch}'. Running push pipeline.`);
+            core.setOutput("should_run", "true");
+
   build-test:
     name: Build & Test
+    needs: guard
+    if: needs.guard.outputs.should_run == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
