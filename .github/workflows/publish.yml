@@ -1,57 +1,91 @@
 name: Publish NuGet
 
 on:
-  workflow_run:
-    workflows: [ "CI" ]
-    types:
-      - completed
+  pull_request:
+    types: [closed]
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   pack-and-publish:
+    name: Pack & Publish (release -> main)
     if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      startsWith(github.event.workflow_run.head_branch, 'v')
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'release/v')
     runs-on: ubuntu-latest
-    steps:
-      - name: Validate version tag format
-        shell: bash
-        run: |
-          REF="${{ github.event.workflow_run.head_branch }}"
-          if [[ ! "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
-            echo "Branch '$REF' does not match version tag pattern (vX.Y.Z or vX.Y.Z-beta.N)"
-            exit 1
-          fi
-          echo "Valid version tag: $REF"
 
-      - name: Checkout
+    steps:
+      - name: Resolve tag + ensure CI succeeded for release SHA
+        id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const releaseBranch = context.payload.pull_request.head.ref; // e.g. release/v1.2.3
+            const releaseSha = context.payload.pull_request.head.sha;
+
+            const m = /^release\/(v\d+\.\d+\.\d+)$/.exec(releaseBranch);
+            if (!m) {
+              core.setFailed(`Release branch '${releaseBranch}' does not match 'release/vX.Y.Z'`);
+              return;
+            }
+
+            const tag = m[1]; // vX.Y.Z
+
+            // 1) Verify that the tag exists and points EXACTLY to the release SHA
+            const refName = `tags/${tag}`;
+            let ref;
+            try {
+              ref = await github.rest.git.getRef({ owner, repo, ref: refName });
+            } catch (e) {
+              core.setFailed(`Expected tag '${tag}' was not found. Create tag '${tag}' on the release branch tip before merging.`);
+              return;
+            }
+
+            const tagSha = ref.data.object.sha;
+            if (tagSha !== releaseSha) {
+              core.setFailed(
+                `Tag '${tag}' points to ${tagSha}, but PR head is ${releaseSha}. ` +
+                `Tag must be created on the latest commit of '${releaseBranch}' before merge.`
+              );
+              return;
+            }
+
+            // 2) Verify CI workflow succeeded for that SHA (real dependency)
+            // NOTE: "CI" must match your workflow name.
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForWorkflow({
+              owner,
+              repo,
+              workflow_id: "CI",
+              head_sha: releaseSha,
+              per_page: 20
+            });
+
+            const successful = runs.workflow_runs.find(r => r.conclusion === "success");
+            if (!successful) {
+              core.setFailed(`No successful CI run found for ${releaseSha}. Make sure CI ran and passed for the tagged release commit.`);
+              return;
+            }
+
+            core.info(`Gate OK: tag '${tag}' exists on release SHA and CI succeeded (run id ${successful.id}).`);
+            core.setOutput("tag", tag);
+            core.setOutput("version", tag.replace(/^v/, ""));
+
+      - name: Checkout tag
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ steps.gate.outputs.tag }}
+          fetch-depth: 0
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
-
-      - name: Determine version from tag
-        shell: bash
-        run: |
-          REF="${{ github.event.workflow_run.head_branch }}"
-          VERSION="${REF#v}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Determined version: $VERSION"
-
-      - name: Validate SemVer (allow -beta.N)
-        shell: bash
-        run: |
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
-            echo "Tag '$VERSION' is not a valid SemVer (allowing -beta.N)."
-            exit 1
-          fi
 
       - name: Restore
         run: dotnet restore
@@ -64,7 +98,7 @@ jobs:
           dotnet pack OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj
           -c Release -o ./nupkg
           --no-build
-          -p:PackageVersion=${{ env.VERSION }}
+          -p:PackageVersion=${{ steps.gate.outputs.version }}
           -p:ContinuousIntegrationBuild=true
 
       - name: Pack DI package
@@ -72,7 +106,7 @@ jobs:
           dotnet pack OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj
           -c Release -o ./nupkg
           --no-build
-          -p:PackageVersion=${{ env.VERSION }}
+          -p:PackageVersion=${{ steps.gate.outputs.version }}
           -p:ContinuousIntegrationBuild=true
 
       - name: Publish to NuGet.org
@@ -85,12 +119,11 @@ jobs:
           --skip-duplicate
 
       - name: Create GitHub Release and upload packages
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          prerelease: ${{ contains(env.VERSION, '-beta.') }}
+          tag_name: ${{ steps.gate.outputs.tag }}
+          name: ${{ steps.gate.outputs.tag }}
+          prerelease: false
           generate_release_notes: true
           files: |
             nupkg/*.nupkg
