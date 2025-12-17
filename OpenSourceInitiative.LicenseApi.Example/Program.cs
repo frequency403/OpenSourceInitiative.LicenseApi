@@ -26,22 +26,23 @@ using (var http = new HttpClient())
 
         // New: server-side keyword filter using strongly-typed enum
         var popular = await direct.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
-        Console.WriteLine($"Popular/strong-community licenses: {popular.Count} (first: {popular.FirstOrDefault()?.Name ?? "n/a"})\n");
+        Console.WriteLine(
+            $"Popular/strong-community licenses: {popular.Count} (first: {popular.FirstOrDefault()?.Name ?? "n/a"})\n");
     }
-
-    ;
 }
 
 // 2) Using DI extensions to register typed client
 Console.WriteLine("2) Dependency Injection usage\n");
 var services = new ServiceCollection();
 services.AddLogging(b => b.AddConsole());
-services.AddOsiLicensesClient(o =>
-{
-    // Optional configuration
-    //o.BaseAddress = new Uri("https://opensource.org/api/");
-    //o.PrimaryHandlerFactory = () => new HttpClientHandler { AllowAutoRedirect = false };
-});
+services.AddOsiLicensesClient(
+//     o =>
+// {
+//     // Optional configuration
+//     //o.BaseAddress = new Uri("https://opensource.org/api/");
+//     //o.PrimaryHandlerFactory = () => new HttpClientHandler { AllowAutoRedirect = false };
+// }
+);
 
 await using var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<IOsiLicensesClient>();

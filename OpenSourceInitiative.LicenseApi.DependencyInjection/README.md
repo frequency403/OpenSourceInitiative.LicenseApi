@@ -2,7 +2,8 @@
 
 DI extensions for `OpenSourceInitiative.LicenseApi`.
 
-Adds `AddOsiLicensesClient(...)` to `IServiceCollection` to register a typed `IOsiLicensesClient` using `IHttpClientFactory`, with optional logging, base address configuration, and custom primary handler.
+Adds `AddOsiLicensesClient(...)` to `IServiceCollection` to register a typed `IOsiLicensesClient` using
+`IHttpClientFactory`, with optional logging, base address configuration, and custom primary handler.
 
 Install:
 
@@ -11,22 +12,23 @@ dotnet add package OpenSourceInitiative.LicenseApi.DependencyInjection
 ```
 
 Options:
+
 - `BaseAddress` (default: `https://opensource.org/api/`)
-- `EnableLogging` (adds a lightweight delegating handler that logs request/response metadata)
 - `PrimaryHandlerFactory` (inject a custom `HttpMessageHandler` – useful for tests)
 
 Model notes:
+
 - `OsiLicense.Keywords` is a strongly-typed `List<OsiLicenseKeyword>` mapped from the OSI API keyword tokens.
   Available values:
-  - `PopularStrongCommunity` → `"popular-strong-community"`
-  - `International` → `"international"`
-  - `SpecialPurpose` → `"special-purpose"`
-  - `NonReusable` → `"non-reusable"`
-  - `Superseded` → `"superseded"`
-  - `VoluntarilyRetired` → `"voluntarily-retired"`
-  - `RedundantWithMorePopular` → `"redundant-with-more-popular"`
-  - `OtherMiscellaneous` → `"other-miscellaneous"`
-  - `Uncategorized` → `"uncategorized"`
+    - `PopularStrongCommunity` → `"popular-strong-community"`
+    - `International` → `"international"`
+    - `SpecialPurpose` → `"special-purpose"`
+    - `NonReusable` → `"non-reusable"`
+    - `Superseded` → `"superseded"`
+    - `VoluntarilyRetired` → `"voluntarily-retired"`
+    - `RedundantWithMorePopular` → `"redundant-with-more-popular"`
+    - `OtherMiscellaneous` → `"other-miscellaneous"`
+    - `Uncategorized` → `"uncategorized"`
 
 Example:
 
@@ -41,7 +43,6 @@ services.AddLogging();
 services.AddOsiLicensesClient(o =>
 {
     // o.BaseAddress = new Uri("https://opensource.org/api/"); // optional
-    o.EnableLogging = true; // optional
 });
 
 await using var provider = services.BuildServiceProvider();

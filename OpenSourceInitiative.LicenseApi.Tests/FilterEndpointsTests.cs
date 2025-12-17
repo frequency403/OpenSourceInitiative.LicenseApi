@@ -1,24 +1,22 @@
 using System.Net;
+using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
-using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class FilterEndpointsTests
 {
-    private static (HttpClient client, StubHttpMessageHandler handler) CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
+    private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
-        var handler = new StubHttpMessageHandler(responder);
-        var http = new HttpClient(handler);
-        return (http, handler);
+        return new HttpClient(new StubHttpMessageHandler(responder));
     }
 
     [Fact]
     public async Task GetLicensesByNameAsync_Calls_FilterEndpoint_And_Parses()
     {
-        var (http, _) = CreateClient(req =>
+        var http = CreateClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == "https://opensource.org/api/licenses?name=mit")
@@ -34,9 +32,10 @@ public class FilterEndpointsTests
                 }) + "]";
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
             }
+
             if (uri.Contains("/license/mit/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>MIT TEXT</div>");
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
@@ -52,7 +51,7 @@ public class FilterEndpointsTests
     [Fact]
     public async Task GetLicensesByKeywordAsync_Parses()
     {
-        var (http, _) = CreateClient(req =>
+        var http = CreateClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == "https://opensource.org/api/licenses?keyword=popular-strong-community")
@@ -74,9 +73,10 @@ public class FilterEndpointsTests
                 }) + "]";
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
             }
+
             if (uri.Contains("/license/mit/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
             if (uri.Contains("/license/apache-2-0/"))
@@ -94,7 +94,7 @@ public class FilterEndpointsTests
     [Fact]
     public async Task GetLicensesByKeywordAsync_Enum_Overload_Builds_Correct_Query()
     {
-        var (http, _) = CreateClient(req =>
+        var http = CreateClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == "https://opensource.org/api/licenses?keyword=popular-strong-community")
@@ -110,9 +110,10 @@ public class FilterEndpointsTests
                 }) + "]";
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
             }
+
             if (uri.Contains("/license/mit/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
@@ -127,7 +128,7 @@ public class FilterEndpointsTests
     [Fact]
     public async Task GetLicensesByStewardAsync_Parses()
     {
-        var (http, _) = CreateClient(req =>
+        var http = CreateClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == "https://opensource.org/api/licenses?steward=eclipse-foundation")
@@ -143,9 +144,10 @@ public class FilterEndpointsTests
                 }) + "]";
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
             }
+
             if (uri.Contains("/license/epl-2-0/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>EPL</div>");
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
@@ -161,7 +163,7 @@ public class FilterEndpointsTests
     [Fact]
     public async Task GetLicensesBySpdxPatternAsync_Parses_Wildcard()
     {
-        var (http, _) = CreateClient(req =>
+        var http = CreateClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == "https://opensource.org/api/licenses?spdx=gpl*")
@@ -177,9 +179,10 @@ public class FilterEndpointsTests
                 }) + "]";
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+                    Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
             }
+
             if (uri.Contains("/license/gpl-3-0/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>GPL3</div>");
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
