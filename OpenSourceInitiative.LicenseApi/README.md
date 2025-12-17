@@ -21,7 +21,7 @@ Basic usage:
 ```csharp
 using OpenSourceInitiative.LicenseApi.Clients;
 
-var http = new HttpClient { BaseAddress = new Uri("https://opensource.org/api/license") };
+var http = new HttpClient { BaseAddress = new Uri("https://opensource.org/api/") };
 using var client = new OsiLicensesClient(http);
 
 // Load all
@@ -37,23 +37,18 @@ var mitAsync = await client.GetBySpdxAsync("MIT");
 
 Dependency Injection (recommended):
 
-Use the companion package `OpenSourceInitiative.LicenseApi.DependencyInjection` to register the client as a typed HTTP
-client.
-
-```bash
-dotnet add package OpenSourceInitiative.LicenseApi.DependencyInjection
-```
+Register the client as a typed HTTP client using the built‑in `ServiceCollection` extensions in this package.
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
-using OpenSourceInitiative.LicenseApi.DependencyInjection.Extensions;
+using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 
 var services = new ServiceCollection();
 services.AddLogging();
 services.AddOsiLicensesClient(o =>
 {
-    // o.BaseAddress = new Uri("https://opensource.org/api/license");
+    // o.BaseAddress = new Uri("https://opensource.org/api/");
 });
 
 await using var provider = services.BuildServiceProvider();

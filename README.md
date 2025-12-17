@@ -3,13 +3,12 @@
 [![CI](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml/badge.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A lightweight, resilient .NET client for the Open Source Initiative (OSI) License API, plus optional Dependency
+A lightweight, resilient .NET client for the Open Source Initiative (OSI) License API, with built‑in Dependency
 Injection (DI) extensions.
 
 This repository contains:
 
-* OpenSourceInitiative.LicenseApi — the core typed client to query OSI licenses
-* OpenSourceInitiative.LicenseApi.DependencyInjection — DI extensions to register the client via IHttpClientFactory
+* OpenSourceInitiative.LicenseApi — the core typed client to query OSI licenses (includes DI registration extensions)
 * OpenSourceInitiative.LicenseApi.Example — a small console app demonstrating direct and DI usage
 * OpenSourceInitiative.LicenseApi.Tests — unit and integration tests
 
@@ -31,11 +30,7 @@ Core client:
  dotnet add package OpenSourceInitiative.LicenseApi
  ```
 
-Dependency Injection extensions (optional):
-
- ```bash
- dotnet add package OpenSourceInitiative.LicenseApi.DependencyInjection
- ```
+Dependency Injection: built‑in via `ServiceCollection` extensions — no extra package needed.
 
 Targets: `net10.0`, `netstandard2.0` (broad platform compatibility)
 
@@ -73,7 +68,7 @@ Targets: `net10.0`, `netstandard2.0` (broad platform compatibility)
  ```csharp
  using Microsoft.Extensions.DependencyInjection;
  using Microsoft.Extensions.Logging;
- using OpenSourceInitiative.LicenseApi.DependencyInjection.Extensions;
+ using OpenSourceInitiative.LicenseApi.Extensions;
  using OpenSourceInitiative.LicenseApi.Interfaces;
 
  var services = new ServiceCollection();
@@ -82,7 +77,6 @@ Targets: `net10.0`, `netstandard2.0` (broad platform compatibility)
  services.AddOsiLicensesClient(o =>
  {
      // o.BaseAddress = new Uri("https://opensource.org/api/"); // optional (this is the default)
-     o.EnableLogging = true; // optional lightweight request/response logging handler
  });
 
  await using var provider = services.BuildServiceProvider();
@@ -157,8 +151,6 @@ decorated to run only when the API is reachable.
 ## Repository layout
 
 * `OpenSourceInitiative.LicenseApi/` — core library (see its [README](OpenSourceInitiative.LicenseApi/README.md))
-* `OpenSourceInitiative.LicenseApi.DependencyInjection/` — DI extensions (see
-  its [README](OpenSourceInitiative.LicenseApi.DependencyInjection/README.md))
 * `OpenSourceInitiative.LicenseApi.Example/` — runnable example
 * `OpenSourceInitiative.LicenseApi.Tests/` — unit and integration tests
 

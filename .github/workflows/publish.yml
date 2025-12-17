@@ -101,14 +101,6 @@ jobs:
           -p:PackageVersion=${{ steps.gate.outputs.version }}
           -p:ContinuousIntegrationBuild=true
 
-      - name: Pack DI package
-        run: >-
-          dotnet pack OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj
-          -c Release -o ./nupkg
-          --no-build
-          -p:PackageVersion=${{ steps.gate.outputs.version }}
-          -p:ContinuousIntegrationBuild=true
-
       - name: Publish to NuGet.org
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}

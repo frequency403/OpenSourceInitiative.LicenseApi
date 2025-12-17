@@ -1,5 +1,5 @@
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
-namespace OpenSourceInitiative.LicenseApi.DependencyInjection.Options;
+namespace OpenSourceInitiative.LicenseApi.Options;
 
 /// <summary>
 ///     Options to control the DI registration behavior for the OSI licenses client.

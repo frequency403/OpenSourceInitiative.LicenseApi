@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
-using OpenSourceInitiative.LicenseApi.DependencyInjection.Extensions;
+using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
