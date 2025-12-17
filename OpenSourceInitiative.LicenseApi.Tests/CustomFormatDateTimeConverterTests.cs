@@ -38,4 +38,39 @@ public class CustomFormatDateTimeConverterTests
         Assert.Null(lic.SubmissionDate);
         Assert.Null(lic.ApprovalDate);
     }
+
+    [Fact]
+    public void Invalid_Date_Format_Throws_JsonException()
+    {
+        var json = "{" + string.Join(',',
+            "\"id\":\"x\"",
+            "\"name\":\"Name\"",
+            "\"submission_date\":\"2025-02-01\"",
+            "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
+        ) + "}";
+
+        Assert.ThrowsAny<JsonException>(() => JsonSerializer.Deserialize<OpenSourceInitiative.LicenseApi.Models.OsiLicense>(json));
+    }
+
+    [Fact]
+    public void Serializes_Dates_In_yyyyMMdd_Format()
+    {
+        var lic = new OpenSourceInitiative.LicenseApi.Models.OsiLicense
+        {
+            Id = "x",
+            Name = "n",
+            SubmissionDate = new DateTime(2024, 12, 31),
+            ApprovalDate = new DateTime(2025, 1, 1),
+            Links = new()
+            {
+                Self = new() { Href = "s" },
+                Html = new() { Href = "h" },
+                Collection = new() { Href = "c" }
+            }
+        };
+
+        var json = JsonSerializer.Serialize(lic);
+        Assert.Contains("\"submission_date\":\"20241231\"", json);
+        Assert.Contains("\"approval_date\":\"20250101\"", json);
+    }
 }
