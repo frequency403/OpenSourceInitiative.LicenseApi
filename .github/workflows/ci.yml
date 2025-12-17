@@ -5,11 +5,13 @@ on:
     branches-ignore:
       - main
       - develop
+      - 'release/**'
   pull_request:
     types: [opened, synchronize, reopened]
 
 jobs:
   build-test:
+    if: github.event_name == 'pull_request' || github.event.pull_request == null
     name: Build & Test
     runs-on: ${{ matrix.os }}
     strategy:
