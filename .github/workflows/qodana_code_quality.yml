@@ -25,6 +25,8 @@ jobs:
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
         with:
+          # Use free community edition
+          args: jetbrains/qodana-dotnet-community
           # When pr-mode is set to true, Qodana analyzes only the files that have been changed
           pr-mode: ${{ github.event_name == 'pull_request' }}
           use-caches: true
