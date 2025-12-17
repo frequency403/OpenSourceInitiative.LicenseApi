@@ -30,7 +30,7 @@ public sealed record OsiLicense
     [JsonPropertyName("version")] public string? Version { get; init; }
 
     /// <summary>
-    /// Date of submission to OSI (format ddMMyyyy in the payload).
+    /// Date of submission to OSI (format yyyyMMdd in the payload).
     /// </summary>
     [JsonPropertyName("submission_date")]
     [JsonConverter(typeof(CustomFormatDateTimeConverter))]
@@ -52,7 +52,7 @@ public sealed record OsiLicense
     [JsonPropertyName("approved")] public bool Approved { get; init; }
 
     /// <summary>
-    /// Date of approval by OSI (format ddMMyyyy in the payload).
+    /// Date of approval by OSI (format yyyyMMdd in the payload).
     /// </summary>
     [JsonPropertyName("approval_date")]
     [JsonConverter(typeof(CustomFormatDateTimeConverter))]

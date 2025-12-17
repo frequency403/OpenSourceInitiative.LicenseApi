@@ -4,7 +4,6 @@ using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.DependencyInjection.Extensions;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
-using OpenSourceInitiative.LicenseApi.Models;
 
 Console.WriteLine("--- OpenSourceInitiative.LicenseApi Example ---\n");
 
@@ -39,7 +38,9 @@ var services = new ServiceCollection();
 services.AddLogging(b => b.AddConsole());
 services.AddOsiLicensesClient(o =>
 {
-    o.EnableLogging = true; // optional logging handler
+    // Optional configuration
+    //o.BaseAddress = new Uri("https://opensource.org/api/");
+    //o.PrimaryHandlerFactory = () => new HttpClientHandler { AllowAutoRedirect = false };
 });
 
 await using var provider = services.BuildServiceProvider();

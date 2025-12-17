@@ -16,11 +16,6 @@ public sealed class OsiClientOptions
     public Uri BaseAddress { get; set; } = new(OpenSourceInitiativeLicenseApiBaseUrl);
 
     /// <summary>
-    /// Enables a simple logging delegating handler for requests and responses.
-    /// </summary>
-    public bool EnableLogging { get; set; } = false;
-
-    /// <summary>
     /// Allows tests/consumers to supply a custom primary HTTP message handler
     /// (e.g., for mocking or adding custom sockets/policies).
     /// </summary>

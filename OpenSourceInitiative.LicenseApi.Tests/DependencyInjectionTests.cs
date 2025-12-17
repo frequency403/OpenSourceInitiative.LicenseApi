@@ -30,7 +30,6 @@ public class DependencyInjectionTests
         services.AddLogging();
         services.AddOsiLicensesClient(o =>
         {
-            o.EnableLogging = true;
             o.PrimaryHandlerFactory = () => handler;
         });
 
