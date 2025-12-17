@@ -11,7 +11,7 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registers <see cref="IOsiLicensesClient"/> as a typed client using <see cref="IHttpClientFactory"/>.
-    /// Supports optional base address configuration, a custom primary handler, and request/response logging.
+    /// Supports optional base address configuration and a custom primary handler.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Optional configuration for the OSI client registration.</param>
