@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   create-tag:
@@ -18,6 +19,7 @@ jobs:
 
     steps:
       - name: Create tag if missing
+        id: tag
         uses: actions/github-script@v7
         with:
           script: |
@@ -44,6 +46,7 @@ jobs:
             try {
               await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
               core.info(`Tag '${tag}' already exists. Skipping.`);
+              core.setOutput("tag", tag);
               return;
             } catch (e) {
               // expected if it doesn't exist
@@ -57,3 +60,26 @@ jobs:
             });
 
             core.info(`Created tag '${tag}' at ${sha}.`);
+            core.setOutput("tag", tag);
+
+      - name: Dispatch publish workflow for the created tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const tag = "${{ steps.tag.outputs.tag }}";
+
+            if (!tag) {
+              core.setFailed("Tag output is missing; cannot dispatch publish workflow.");
+              return;
+            }
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: "publish.yml",
+              ref: tag
+            });
+
+            core.info(`Dispatched publish.yml for ref '${tag}'.`);

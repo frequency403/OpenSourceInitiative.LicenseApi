@@ -5,6 +5,7 @@
         <File Path=".github/workflows/ci.yml" />
         <File Path=".github/workflows/publish.yml" />
         <File Path=".github/workflows/codeql.yml" />
+        <File Path=".github/workflows/create-tag-on-merge.yml"/>
         <File Path="CODE_OF_CONDUCT.md" />
         <File Path="Directory.Build.props" />
         <File Path="LICENSE" />
