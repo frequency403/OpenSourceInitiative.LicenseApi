@@ -12,7 +12,7 @@ on:
 jobs:
   build-test:
     name: Build & Test
-    if: github.event_name != 'push' || github.event.pull_request == null
+    if: github.event_name == 'pull_request' || github.head_ref == ''  
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
