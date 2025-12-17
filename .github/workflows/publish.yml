@@ -14,9 +14,19 @@ jobs:
     if: |
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch =~ '^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'
+      startsWith(github.event.workflow_run.head_branch, 'v')
     runs-on: ubuntu-latest
     steps:
+      - name: Validate version tag format
+        shell: bash
+        run: |
+          REF="${{ github.event.workflow_run.head_branch }}"
+          if [[ ! "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo "Branch '$REF' does not match version tag pattern (vX.Y.Z or vX.Y.Z-beta.N)"
+            exit 1
+          fi
+          echo "Valid version tag: $REF"
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
