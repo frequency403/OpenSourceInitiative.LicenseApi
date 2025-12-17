@@ -1,5 +1,8 @@
-// ReSharper disable once CheckNamespace
+using JetBrains.Annotations;
+// ReSharper disable CheckNamespace
+
 namespace System.Runtime.CompilerServices;
 
 // Enables 'init' accessors on older target frameworks
-public sealed class IsExternalInit { }
+[UsedImplicitly]
+public sealed class IsExternalInit;

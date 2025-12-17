@@ -1,21 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\OpenSourceInitiative.LicenseApi\OpenSourceInitiative.LicenseApi.csproj" />
-    <ProjectReference Include="..\OpenSourceInitiative.LicenseApi.DependencyInjection\OpenSourceInitiative.LicenseApi.DependencyInjection.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\OpenSourceInitiative.LicenseApi\OpenSourceInitiative.LicenseApi.csproj"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.1" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.1"/>
+    </ItemGroup>
 
 </Project>

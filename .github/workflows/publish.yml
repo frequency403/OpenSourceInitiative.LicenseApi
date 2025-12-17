@@ -2,43 +2,51 @@ name: Publish NuGet
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+'
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
 
 jobs:
   pack-and-publish:
-    if: github.event.base_ref == 'refs/heads/main'
+    name: Pack & Publish (tag)
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout tag
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version from tag + ensure tag is on main
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${GITHUB_REF_NAME}"     # vM.m.P
+          VERSION="${TAG#v}"           # M.m.P
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag '$TAG' is not SemVer (vM.m.P)."
+            exit 1
+          fi
+
+          # Ensure the tagged commit is reachable from main
+          git fetch origin main --tags --force
+          if ! git branch -r --contains HEAD | grep -qE 'origin/main$'; then
+            echo "Tagged commit is not contained in origin/main; refusing to publish."
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
-
-      - name: Determine version from tag
-        shell: bash
-        run: |
-          REF="${GITHUB_REF_NAME:-${{ github.ref_name }}}"
-          VERSION="${REF#v}"
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Determined version: $VERSION"
-
-      - name: Validate SemVer (allow -beta.N)
-        shell: bash
-        run: |
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
-            echo "Tag '$VERSION' is not a valid SemVer (allowing -beta.N)."
-            exit 1
-          fi
+          dotnet-version: "10.0.x"
 
       - name: Restore
         run: dotnet restore
@@ -51,15 +59,7 @@ jobs:
           dotnet pack OpenSourceInitiative.LicenseApi/OpenSourceInitiative.LicenseApi.csproj
           -c Release -o ./nupkg
           --no-build
-          -p:PackageVersion=${{ env.VERSION }}
-          -p:ContinuousIntegrationBuild=true
-
-      - name: Pack DI package
-        run: >-
-          dotnet pack OpenSourceInitiative.LicenseApi.DependencyInjection/OpenSourceInitiative.LicenseApi.DependencyInjection.csproj
-          -c Release -o ./nupkg
-          --no-build
-          -p:PackageVersion=${{ env.VERSION }}
+          -p:PackageVersion=${{ steps.gate.outputs.version }}
           -p:ContinuousIntegrationBuild=true
 
       - name: Publish to NuGet.org
@@ -72,12 +72,11 @@ jobs:
           --skip-duplicate
 
       - name: Create GitHub Release and upload packages
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          prerelease: ${{ contains(env.VERSION, '-beta.') }}
+          tag_name: ${{ steps.gate.outputs.tag }}
+          name: ${{ steps.gate.outputs.tag }}
+          prerelease: false
           generate_release_notes: true
           files: |
             nupkg/*.nupkg

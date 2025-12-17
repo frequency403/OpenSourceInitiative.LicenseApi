@@ -1,24 +1,28 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <Description>Lightweight client for the Open Source Initiative (OSI) License API. Fetches OSI license catalog and extracts human-readable license text from the HTML pages. Designed to be resilient and allocation-friendly. Multi-targets net10.0 and netstandard2.0.</Description>
-    <PackageTags>OSI;Open Source Initiative;License;SPDX;License API;OpenSource</PackageTags>
-  </PropertyGroup>
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+        <LangVersion>latest</LangVersion>
+        <Description>Lightweight client for the Open Source Initiative (OSI) License API. Fetches OSI license catalog and extracts human-readable license text from the HTML pages. Designed to be resilient and allocation-friendly. Multi-targets net10.0 and netstandard2.0.</Description>
+        <PackageTags>OSI;Open Source Initiative;License;SPDX;License API;OpenSource</PackageTags>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-  </ItemGroup>
-  
-  <Choose>
-    <When Condition="'$(TargetFramework)' == 'netstandard2.0'">
-      <ItemGroup>
-        <PackageReference Include="System.Text.Json" Version="10.0.1"/>
-      </ItemGroup>
-    </When>
-  </Choose>
+    <ItemGroup>
+        <PackageReference Include="HtmlAgilityPack" Version="1.12.4"/>
+        <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.1"/>
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.1"/>
+    </ItemGroup>
+
+    <Choose>
+        <When Condition="'$(TargetFramework)' == 'netstandard2.0'">
+            <ItemGroup>
+                <PackageReference Include="System.Text.Json" Version="10.0.1"/>
+            </ItemGroup>
+        </When>
+    </Choose>
 
 </Project>

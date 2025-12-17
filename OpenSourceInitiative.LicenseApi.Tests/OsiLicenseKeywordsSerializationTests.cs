@@ -18,7 +18,7 @@ public class OsiLicenseKeywordsSerializationTests
 
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
         Assert.NotNull(lic);
-        Assert.NotNull(lic!.Keywords);
+        Assert.NotNull(lic.Keywords);
         Assert.Contains(OsiLicenseKeyword.PopularStrongCommunity, lic.Keywords);
         Assert.Contains(OsiLicenseKeyword.International, lic.Keywords);
     }
