@@ -2,196 +2,240 @@ using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
+using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class FilterEndpointsTests
 {
-    private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
+    public static IEnumerable<object[]> SuccessCases()
     {
-        return new HttpClient(new StubHttpMessageHandler(responder));
+        // name=mit
+        yield return
+        [
+            // call
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByNameAsync("mit")),
+            // first request url
+            "https://opensource.org/api/licenses?name=mit",
+            // json
+            "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]",
+            // html map (substring -> inner text)
+            new Dictionary<string, string> { ["/license/mit/"] = "MIT TEXT" },
+            // expected spdx ids
+            new[] { "MIT" },
+            // expected text per SPDX
+            new Dictionary<string, string> { ["MIT"] = "MIT TEXT" }
+        ];
+
+        // keyword=popular-strong-community (string overload) with 2 items
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByKeywordAsync("popular-strong-community")),
+            "https://opensource.org/api/licenses?keyword=popular-strong-community",
+            "[" + string.Join(',', new[]
+            {
+                "{" + string.Join(',',
+                    "\"id\":\"mit\"",
+                    "\"name\":\"MIT License\"",
+                    "\"spdx_id\":\"MIT\"",
+                    "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}"
+                ) + "}",
+                "{" + string.Join(',',
+                    "\"id\":\"apache-2.0\"",
+                    "\"name\":\"Apache License 2.0\"",
+                    "\"spdx_id\":\"Apache-2.0\"",
+                    "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/apache-2-0/\"},\"collection\":{\"href\":\"c\"}}"
+                ) + "}"
+            }) + "]",
+            new Dictionary<string, string>
+            {
+                ["/license/mit/"] = "MIT",
+                ["/license/apache-2-0/"] = "APACHE"
+            },
+            new[] { "MIT", "Apache-2.0" },
+            new Dictionary<string, string> { ["MIT"] = "MIT", ["Apache-2.0"] = "APACHE" }
+        ];
+
+        // keyword enum overload => same request url
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity)),
+            "https://opensource.org/api/licenses?keyword=popular-strong-community",
+            "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]",
+            new Dictionary<string, string> { ["/license/mit/"] = "MIT" },
+            new[] { "MIT" },
+            new Dictionary<string, string> { ["MIT"] = "MIT" }
+        ];
+
+        // steward=eclipse-foundation
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByStewardAsync("eclipse-foundation")),
+            "https://opensource.org/api/licenses?steward=eclipse-foundation",
+            "[{\"id\":\"epl-2.0\",\"name\":\"Eclipse Public License 2.0\",\"spdx_id\":\"EPL-2.0\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/epl-2-0/\"},\"collection\":{\"href\":\"c\"}}}]",
+            new Dictionary<string, string> { ["/license/epl-2-0/"] = "EPL" },
+            new[] { "EPL-2.0" },
+            new Dictionary<string, string> { ["EPL-2.0"] = "EPL" }
+        ];
+
+        // spdx=gpl* (wildcard preserved)
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesBySpdxPatternAsync("gpl*")),
+            "https://opensource.org/api/licenses?spdx=gpl*",
+            "[{\"id\":\"gpl-3.0\",\"name\":\"GNU GPL v3\",\"spdx_id\":\"GPL-3.0-only\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/gpl-3-0/\"},\"collection\":{\"href\":\"c\"}}}]",
+            new Dictionary<string, string> { ["/license/gpl-3-0/"] = "GPL3" },
+            new[] { "GPL-3.0-only" },
+            new Dictionary<string, string> { ["GPL-3.0-only"] = "GPL3" }
+        ];
     }
 
-    [Fact]
-    public async Task GetLicensesByNameAsync_Calls_FilterEndpoint_And_Parses()
+    public static IEnumerable<object[]> EdgeCases()
     {
-        var http = CreateClient(req =>
+        // Empty or whitespace => empty result (guard path) for string overloads
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByNameAsync("")),
+            null!,
+            null!,
+            new Dictionary<string, string>(),
+            0
+        ];
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByStewardAsync(" \t")),
+            null!,
+            null!,
+            new Dictionary<string, string>(),
+            0
+        ];
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByKeywordAsync("")),
+            null!,
+            null!,
+            new Dictionary<string, string>(),
+            0
+        ];
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesBySpdxPatternAsync("")),
+            null!,
+            null!,
+            new Dictionary<string, string>(),
+            0
+        ];
+
+        // HTTP 500 => empty result
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByNameAsync("mit")),
+            "https://opensource.org/api/licenses?name=mit",
+            "__HTTP_500__",
+            new Dictionary<string, string>(),
+            0
+        ];
+
+        // Empty array => empty result
+        yield return
+        [
+            (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
+                c.GetLicensesByKeywordAsync("popular-strong-community")),
+            "https://opensource.org/api/licenses?keyword=popular-strong-community",
+            "[]",
+            new Dictionary<string, string>(),
+            0
+        ];
+    }
+
+    [Theory]
+    [MemberData(nameof(SuccessCases))]
+    public async Task FetchFiltered_Endpoints_Success_Scenarios(
+        Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>> call,
+        string requestUrl,
+        string json,
+        Dictionary<string, string> htmlMap,
+        string[] expectedSpdxIds,
+        Dictionary<string, string> expectedTexts)
+    {
+        // Arrange
+        var http = new HttpClient(new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/licenses?name=mit")
-            {
-                var json = "[" + string.Join(',', new[]
-                {
-                    "{" + string.Join(',',
-                        "\"id\":\"mit\"",
-                        "\"name\":\"MIT License\"",
-                        "\"spdx_id\":\"MIT\"",
-                        "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}"
-                    ) + "}"
-                }) + "]";
+            if (uri == requestUrl)
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
-            }
 
-            if (uri.Contains("/license/mit/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>MIT TEXT</div>");
+            foreach (var kv in htmlMap)
+                if (uri.Contains(kv.Key))
+                    return StubHttpMessageHandler.Html($"<div class='license-content'>{kv.Value}</div>");
+
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-
+        }));
         await using var client = new OsiLicensesClient(http);
-        var list = await client.GetLicensesByNameAsync("mit");
-        Assert.Single(list);
-        Assert.Equal("MIT", list[0].SpdxId);
-        Assert.Equal("MIT TEXT", list[0].LicenseText);
+
+        // Act
+        var list = await call(client);
+
+        // Assert
+        list.Should().NotBeNull();
+        list.Select(l => l.SpdxId).Should().BeEquivalentTo(expectedSpdxIds, o => o.WithoutStrictOrdering());
+        foreach (var kv in expectedTexts) list.First(l => l.SpdxId == kv.Key).LicenseText.Should().Be(kv.Value);
     }
 
-    [Fact]
-    public async Task GetLicensesByKeywordAsync_Parses()
+    [Theory]
+    [MemberData(nameof(EdgeCases))]
+    public async Task FetchFiltered_Endpoints_Edge_Cases(
+        Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>> call,
+        string requestUrl,
+        string? json,
+        Dictionary<string, string> htmlMap,
+        int expectedCount)
     {
-        var http = CreateClient(req =>
+        // Arrange
+        var http = new HttpClient(new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/licenses?keyword=popular-strong-community")
+
+            // If no request URL is provided, these are guard-path cases where HTTP should not be called.
+            if (requestUrl is null)
+                return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
+
+            if (uri == requestUrl)
             {
-                var json = "[" + string.Join(',', new[]
-                {
-                    "{" + string.Join(',',
-                        "\"id\":\"mit\"",
-                        "\"name\":\"MIT License\"",
-                        "\"spdx_id\":\"MIT\"",
-                        "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}"
-                    ) + "}",
-                    "{" + string.Join(',',
-                        "\"id\":\"apache-2.0\"",
-                        "\"name\":\"Apache License 2.0\"",
-                        "\"spdx_id\":\"Apache-2.0\"",
-                        "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/apache-2-0/\"},\"collection\":{\"href\":\"c\"}}"
-                    ) + "}"
-                }) + "]";
+                if (json == "__HTTP_500__") return StubHttpMessageHandler.Status(HttpStatusCode.InternalServerError);
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
+                    Content = new StringContent(json!, Encoding.UTF8, "application/json")
                 };
             }
 
-            if (uri.Contains("/license/mit/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
-            if (uri.Contains("/license/apache-2-0/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>APACHE</div>");
+            foreach (var kv in htmlMap)
+                if (uri.Contains(kv.Key))
+                    return StubHttpMessageHandler.Html($"<div class='license-content'>{kv.Value}</div>");
+
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-
+        }));
         await using var client = new OsiLicensesClient(http);
-        var list = await client.GetLicensesByKeywordAsync("popular-strong-community");
-        Assert.Equal(2, list.Count);
-        Assert.Contains(list, l => l.SpdxId == "MIT");
-        Assert.Contains(list, l => l.SpdxId == "Apache-2.0");
-    }
 
-    [Fact]
-    public async Task GetLicensesByKeywordAsync_Enum_Overload_Builds_Correct_Query()
-    {
-        var http = CreateClient(req =>
-        {
-            var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/licenses?keyword=popular-strong-community")
-            {
-                var json = "[" + string.Join(',', new[]
-                {
-                    "{" + string.Join(',',
-                        "\"id\":\"mit\"",
-                        "\"name\":\"MIT License\"",
-                        "\"spdx_id\":\"MIT\"",
-                        "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}"
-                    ) + "}"
-                }) + "]";
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
-                };
-            }
+        // Act
+        var list = await call(client);
 
-            if (uri.Contains("/license/mit/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
-            return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-
-        await using var client = new OsiLicensesClient(http);
-        var list = await client.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
-        Assert.Single(list);
-        Assert.Equal("MIT", list[0].SpdxId);
-    }
-
-    [Fact]
-    public async Task GetLicensesByStewardAsync_Parses()
-    {
-        var http = CreateClient(req =>
-        {
-            var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/licenses?steward=eclipse-foundation")
-            {
-                var json = "[" + string.Join(',', new[]
-                {
-                    "{" + string.Join(',',
-                        "\"id\":\"epl-2.0\"",
-                        "\"name\":\"Eclipse Public License 2.0\"",
-                        "\"spdx_id\":\"EPL-2.0\"",
-                        "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/epl-2-0/\"},\"collection\":{\"href\":\"c\"}}"
-                    ) + "}"
-                }) + "]";
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
-                };
-            }
-
-            if (uri.Contains("/license/epl-2-0/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>EPL</div>");
-            return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-
-        await using var client = new OsiLicensesClient(http);
-        var list = await client.GetLicensesByStewardAsync("eclipse-foundation");
-        Assert.Single(list);
-        Assert.Equal("EPL-2.0", list[0].SpdxId);
-        Assert.Equal("EPL", list[0].LicenseText);
-    }
-
-    [Fact]
-    public async Task GetLicensesBySpdxPatternAsync_Parses_Wildcard()
-    {
-        var http = CreateClient(req =>
-        {
-            var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/licenses?spdx=gpl*")
-            {
-                var json = "[" + string.Join(',', new[]
-                {
-                    "{" + string.Join(',',
-                        "\"id\":\"gpl-3.0\"",
-                        "\"name\":\"GNU GPL v3\"",
-                        "\"spdx_id\":\"GPL-3.0-only\"",
-                        "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/gpl-3-0/\"},\"collection\":{\"href\":\"c\"}}"
-                    ) + "}"
-                }) + "]";
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
-                };
-            }
-
-            if (uri.Contains("/license/gpl-3-0/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>GPL3</div>");
-            return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-
-        await using var client = new OsiLicensesClient(http);
-        var list = await client.GetLicensesBySpdxPatternAsync("gpl*");
-        Assert.Single(list);
-        Assert.Equal("GPL-3.0-only", list[0].SpdxId);
-        Assert.Equal("GPL3", list[0].LicenseText);
+        // Assert
+        list.Should().NotBeNull();
+        list.Should().HaveCount(expectedCount);
     }
 }

@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 
 namespace OpenSourceInitiative.LicenseApi.Log;
 
+[ExcludeFromCodeCoverage]
 internal static partial class LoggerMethods
 {
     [LoggerMessage(LogLevel.Debug, "Acquiring initialization lock")]

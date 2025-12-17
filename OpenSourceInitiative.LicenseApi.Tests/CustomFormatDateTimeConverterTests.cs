@@ -8,6 +8,7 @@ public class CustomFormatDateTimeConverterTests
     [Fact]
     public void Deserializes_Dates_In_yyyyMMdd_Format()
     {
+        // Arrange
         var json = "{" + string.Join(',',
             "\"id\":\"x\"",
             "\"name\":\"Name\"",
@@ -16,15 +17,19 @@ public class CustomFormatDateTimeConverterTests
             "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
         ) + "}";
 
+        // Act
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
-        Assert.NotNull(lic);
-        Assert.Equal(new DateTime(2025, 2, 1), lic.SubmissionDate);
-        Assert.Equal(new DateTime(2025, 3, 2), lic.ApprovalDate);
+
+        // Assert
+        lic.Should().NotBeNull();
+        lic!.SubmissionDate.Should().Be(new DateTime(2025, 2, 1));
+        lic.ApprovalDate.Should().Be(new DateTime(2025, 3, 2));
     }
 
     [Fact]
     public void Null_Or_Empty_Dates_Parse_As_Null()
     {
+        // Arrange
         var json = "{" + string.Join(',',
             "\"id\":\"x\"",
             "\"name\":\"Name\"",
@@ -33,15 +38,19 @@ public class CustomFormatDateTimeConverterTests
             "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
         ) + "}";
 
+        // Act
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
-        Assert.NotNull(lic);
-        Assert.Null(lic.SubmissionDate);
-        Assert.Null(lic.ApprovalDate);
+
+        // Assert
+        lic.Should().NotBeNull();
+        lic!.SubmissionDate.Should().BeNull();
+        lic.ApprovalDate.Should().BeNull();
     }
 
     [Fact]
     public void Invalid_Date_Format_Throws_JsonException()
     {
+        // Arrange
         var json = "{" + string.Join(',',
             "\"id\":\"x\"",
             "\"name\":\"Name\"",
@@ -49,28 +58,36 @@ public class CustomFormatDateTimeConverterTests
             "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
         ) + "}";
 
-        Assert.ThrowsAny<JsonException>(() => JsonSerializer.Deserialize<OpenSourceInitiative.LicenseApi.Models.OsiLicense>(json));
+        // Act
+        var act = () => JsonSerializer.Deserialize<OsiLicense>(json);
+
+        // Assert
+        act.Should().Throw<JsonException>();
     }
 
     [Fact]
     public void Serializes_Dates_In_yyyyMMdd_Format()
     {
-        var lic = new OpenSourceInitiative.LicenseApi.Models.OsiLicense
+        // Arrange
+        var lic = new OsiLicense
         {
             Id = "x",
             Name = "n",
             SubmissionDate = new DateTime(2024, 12, 31),
             ApprovalDate = new DateTime(2025, 1, 1),
-            Links = new()
+            Links = new OsiLicenseLinks
             {
-                Self = new() { Href = "s" },
-                Html = new() { Href = "h" },
-                Collection = new() { Href = "c" }
+                Self = new OsiHref { Href = "s" },
+                Html = new OsiHref { Href = "h" },
+                Collection = new OsiHref { Href = "c" }
             }
         };
 
+        // Act
         var json = JsonSerializer.Serialize(lic);
-        Assert.Contains("\"submission_date\":\"20241231\"", json);
-        Assert.Contains("\"approval_date\":\"20250101\"", json);
+
+        // Assert
+        json.Should().Contain("\"submission_date\":\"20241231\"");
+        json.Should().Contain("\"approval_date\":\"20250101\"");
     }
 }

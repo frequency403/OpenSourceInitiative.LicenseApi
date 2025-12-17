@@ -9,24 +9,30 @@ public class DisposeBehaviorTests
     [Fact]
     public void Disposing_DefaultConstructed_Client_Disposes_Internal_HttpClient()
     {
+        // Arrange
         var client = new OsiLicensesClient();
-        client.Dispose();
 
-        // After dispose, any operation using the internal HttpClient should throw ObjectDisposedException
-        Assert.Throws<ObjectDisposedException>(() => client.Initialize());
+        // Act
+        client.Dispose();
+        var act = () => client.Initialize();
+
+        // Assert
+        act.Should().Throw<ObjectDisposedException>();
     }
 
     [Fact]
     public async Task Disposing_Client_Does_Not_Dispose_External_HttpClient()
     {
+        // Arrange
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
         var externalHttp = new HttpClient(handler);
-
         var client = new OsiLicensesClient(externalHttp);
-        await client.DisposeAsync();
 
-        // External HttpClient should remain usable
+        // Act
+        await client.DisposeAsync();
         var resp = await externalHttp.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.com/"));
-        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+
+        // Assert
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

@@ -14,9 +14,12 @@ public class SearchAndLookupTests
         return new HttpClient(new StubHttpMessageHandler(responder));
     }
 
-    [Fact]
-    public async Task SearchAsync_ByNameAndId_ReturnsMatches()
+    [Theory]
+    [InlineData("Apache", "Apache-2.0")]
+    [InlineData("mit", "MIT")]
+    public async Task SearchAsync_Finds_By_Name_Or_Id_And_Sync_Wrapper_Works(string query, string expectedSpdx)
     {
+        // Arrange
         var json = "[" + string.Join(',', new[]
         {
             "{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}",
@@ -25,65 +28,63 @@ public class SearchAndLookupTests
 
         var http = CreateClient(req =>
         {
-            if (req.RequestUri!.ToString() == ApiBase)
+            var uri = req.RequestUri!.ToString();
+            if (uri == ApiBase)
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
-            if (req.RequestUri!.ToString().Contains("/license/mit/"))
+            if (uri.Contains("/license/mit/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
-            if (req.RequestUri!.ToString().Contains("/license/apache-2-0/"))
+            if (uri.Contains("/license/apache-2-0/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>APACHE</div>");
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
         await using var client = new OsiLicensesClient(http);
+
+        // Act
         var all = await client.GetAllLicensesAsync();
-        Assert.Equal(2, all.Count);
+        var results = await client.SearchAsync(query);
+        var syncResults = client.Search(query); // sync wrapper
+        var allSync = client.GetAllLicenses(); // sync wrapper for GetAll
 
-        var byName = await client.SearchAsync("Apache");
-        Assert.Single(byName);
-        Assert.Equal("Apache-2.0", byName[0].SpdxId);
-
-        var byId = await client.SearchAsync("mit");
-        Assert.Single(byId);
-        Assert.Equal("MIT", byId[0].SpdxId);
-
-        // sync wrappers
-        // ReSharper disable once MethodHasAsyncOverload
-        var byNameSync = client.Search("Apache");
-        Assert.Single(byNameSync);
-        // ReSharper disable once MethodHasAsyncOverload
-        var allSync = client.GetAllLicenses();
-        Assert.Equal(2, allSync.Count);
+        // Assert
+        all.Count.Should().Be(2);
+        results.Should().ContainSingle().Which.SpdxId.Should().Be(expectedSpdx);
+        syncResults.Should().ContainSingle().Which.SpdxId.Should().Be(expectedSpdx);
+        allSync.Count.Should().Be(2);
     }
 
     [Fact]
     public async Task GetBySpdx_Works_Async_And_Sync()
     {
+        // Arrange
         var json =
             "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
         var http = CreateClient(req =>
         {
-            if (req.RequestUri!.ToString() == ApiBase)
+            var uri = req.RequestUri!.ToString();
+            if (uri == ApiBase)
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
                 };
-            if (req.RequestUri!.ToString().Contains("/license/mit/"))
+            if (uri.Contains("/license/mit/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
         await using var client = new OsiLicensesClient(http);
-        var licAsync = await client.GetBySpdxAsync("MIT");
-        Assert.NotNull(licAsync);
-        Assert.Equal("MIT", licAsync.SpdxId);
 
-        // ReSharper disable once MethodHasAsyncOverload
-        // The call to the sync method is intended here
-        var licSync = client.GetBySpdx("MIT");
-        Assert.NotNull(licSync);
-        Assert.Equal("MIT", licSync.SpdxId);
+        // Act
+        var licAsync = await client.GetBySpdxAsync("MIT");
+        var licSync = client.GetBySpdx("MIT"); // sync variant
+
+        // Assert
+        licAsync.Should().NotBeNull();
+        licAsync!.SpdxId.Should().Be("MIT");
+        licSync.Should().NotBeNull();
+        licSync!.SpdxId.Should().Be("MIT");
     }
 }
