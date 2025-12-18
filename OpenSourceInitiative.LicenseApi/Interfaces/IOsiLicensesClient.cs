@@ -10,8 +10,8 @@ namespace OpenSourceInitiative.LicenseApi.Interfaces;
 /// <remarks>
 ///     The client is designed to be resilient:
 ///     - Fetches the catalog of OSI licenses and extracts human‑readable license text from the HTML pages.
-///     - Maintains an in‑memory, thread‑safe cache of licenses once loaded; subsequent queries operate on this snapshot.
-///     - All network calls are fail‑safe. On errors, the client returns the last available snapshot (which may be empty).
+///     - Maintains an in‑memory, thread‑safe cache of licenses once loaded (if caching is enabled); subsequent queries operate on this snapshot.
+///     - Network calls throw library-specific exceptions on failure.
 ///     - Provides both asynchronous methods and synchronous counterparts for convenience.
 /// </remarks>
 public interface IOsiLicensesClient : IDisposable, IAsyncDisposable

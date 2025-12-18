@@ -11,6 +11,8 @@ using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Log;
 using OpenSourceInitiative.LicenseApi.Models;
+using OpenSourceInitiative.LicenseApi.Options;
+using OpenSourceInitiative.LicenseApi.Exceptions;
 #if NET10_0_OR_GREATER
 using System.Net.Http.Json;
 
@@ -25,7 +27,7 @@ namespace OpenSourceInitiative.LicenseApi.Clients;
 /// <remarks>
 ///     - Uses an internal, thread-safe map to store licenses and a stable snapshot list for enumeration.
 ///     - Fetches the OSI catalog and extracts license text from the referenced HTML page per item.
-///     - Network calls are fail-safe; on any error the current snapshot is returned (possibly empty).
+///     - Network calls throw library-specific exceptions on failure.
 ///     - All async APIs have synchronous counterparts for environments where async is not desired.
 /// </remarks>
 public class OsiLicensesClient : IOsiLicensesClient
@@ -40,6 +42,7 @@ public class OsiLicensesClient : IOsiLicensesClient
     private readonly ILogger<OsiLicensesClient> _logger;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
+    private readonly OsiClientOptions _options;
     private readonly SemaphoreSlim _initGate = new(1, 1);
     private volatile bool _initialized;
 
@@ -56,27 +59,37 @@ public class OsiLicensesClient : IOsiLicensesClient
     /// </summary>
     /// <param name="logger">Optional logger instance.</param>
     public OsiLicensesClient(ILogger<OsiLicensesClient>? logger = null)
+        : this(new OsiClientOptions(), logger)
     {
+    }
+
+    /// <summary>
+    ///     Creates a client with its own <see cref="HttpClient" /> and specific <paramref name="options" />.
+    /// </summary>
+    /// <param name="options">Configuration options.</param>
+    /// <param name="logger">Optional logger instance.</param>
+    public OsiLicensesClient(OsiClientOptions options, ILogger<OsiLicensesClient>? logger = null)
+    {
+        _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? NullLogger<OsiLicensesClient>.Instance;
-        _httpClient = new HttpClient { BaseAddress = new Uri(ApiBase) };
+        _httpClient = new HttpClient { BaseAddress = options.BaseAddress };
         EnsureDefaultHeaders(_httpClient);
         _ownsHttpClient = true;
     }
 
     /// <summary>
-    ///     Creates a client that uses the provided <paramref name="httpClient" /> (not disposed by this instance).
+    ///     Creates a client that uses the provided <paramref name="httpClient" /> and <paramref name="options" />.
     /// </summary>
-    /// <param name="httpClient">
-    ///     Configured HTTP client. If <see cref="HttpClient.BaseAddress" /> is null, it will be set to
-    ///     the OSI API base.
-    /// </param>
+    /// <param name="httpClient">Configured HTTP client.</param>
+    /// <param name="options">Optional configuration options.</param>
     /// <param name="logger">Optional logger instance.</param>
-    public OsiLicensesClient(HttpClient httpClient, ILogger<OsiLicensesClient>? logger = null)
+    public OsiLicensesClient(HttpClient httpClient, OsiClientOptions? options = null, ILogger<OsiLicensesClient>? logger = null)
     {
+        _options = options ?? new OsiClientOptions();
         _logger = logger ?? NullLogger<OsiLicensesClient>.Instance;
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _ownsHttpClient = false;
-        _httpClient.BaseAddress ??= new Uri(ApiBase);
+        _httpClient.BaseAddress ??= _options.BaseAddress;
         EnsureDefaultHeaders(_httpClient);
     }
 
@@ -100,10 +113,14 @@ public class OsiLicensesClient : IOsiLicensesClient
             _initialized = true;
             LoggerMethods.LogOsilicensesclientInitializationCompletedSuccessfully(_logger);
         }
-        catch (Exception)
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
         {
             LoggerMethods.LogFailedToInitializeOsilicensesclient(_logger);
-            throw;
+            throw new OsiInitializationException("Failed to initialize OsiLicensesClient", ex);
         }
         finally
         {
@@ -122,7 +139,7 @@ public class OsiLicensesClient : IOsiLicensesClient
     public async Task<IReadOnlyList<OsiLicense>> GetAllLicensesAsync(CancellationToken cancellationToken = default)
     {
         // Fast path: if already populated and not cancelled, return snapshot
-        if (Licenses.Count > 0)
+        if (_options.EnableCaching && Licenses.Count > 0)
         {
             LoggerMethods.LogReturningCachedSnapshotOfCountLicenses(_logger, Licenses.Count);
             return Licenses;
@@ -133,6 +150,12 @@ public class OsiLicensesClient : IOsiLicensesClient
 
         // Stream the licenses list and then fetch texts concurrently (bounded)
         var list = new List<OsiLicense>(256);
+        
+        // Clear current cache if we are refetching (not enabling caching or forced refresh)
+        if (!_options.EnableCaching)
+        {
+            _licenses.Clear();
+        }
         try
         {
             LoggerMethods.LogStartingStreamingDeserializationFromPath(_logger, LicensesPath);
@@ -160,10 +183,14 @@ public class OsiLicensesClient : IOsiLicensesClient
 
             LoggerMethods.LogStreamingDeserializationCompletedLoadedCountLicenses(_logger, _licenses.Count);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception)
         {
             LoggerMethods.LogStreamingDeserializationFailedFallingBackToArrayDeserialization(_logger);
-            // Ignore streaming errors; attempt JSON array fallback below
+            if (_options.EnableCaching) throw;
         }
 
         // Fallback: if streaming returned nothing, try parsing as a JSON array
@@ -193,10 +220,14 @@ public class OsiLicensesClient : IOsiLicensesClient
                     }
                 }
             }
-            catch (Exception)
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
             {
                 LoggerMethods.LogFallbackDeserializationFailed(_logger);
-                // still fail-safe; leave dictionary empty
+                throw new OsiApiException("Failed to fetch licenses from OSI API", ex);
             }
         }
 
@@ -240,10 +271,14 @@ public class OsiLicensesClient : IOsiLicensesClient
             await Task.WhenAll(tasks).ConfigureAwait(false);
             LoggerMethods.LogAllLicenseTextFetchOperationsCompleted(_logger);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception)
         {
             LoggerMethods.LogSomeLicenseTextFetchOperationsFailed(_logger);
-            // Ignore aggregate exceptions from cancelled tasks; fail-safe behavior
+            // We don't throw here as we want to return what we have
         }
 
         list.AddRange(_licenses.Values);
@@ -414,26 +449,23 @@ public class OsiLicensesClient : IOsiLicensesClient
         try
         {
 #if NET10_0_OR_GREATER
-            await
-#endif
-                using var stream = await _httpClient.GetStreamAsync(request
-#if NET10_0_OR_GREATER
-                    , cancellationToken
-#endif
-                ).ConfigureAwait(false);
-#if NET10_0_OR_GREATER
-            items = await JsonSerializer
-                .DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await using var stream = await _httpClient.GetStreamAsync(request, cancellationToken).ConfigureAwait(false);
 #else
-            items =
-                await JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+            using var stream = await _httpClient.GetStreamAsync(request).ConfigureAwait(false);
 #endif
+            items =
+                await JsonSerializer.DeserializeAsync<OsiLicense[]>(stream, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
             LoggerMethods.LogDeserializedCountFilteredLicenses(_logger, items?.Length ?? 0);
         }
-        catch (Exception)
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
         {
             LoggerMethods.LogFailedToFetchFilteredLicensesByParamnameParamvalue(_logger, paramName, paramValue);
-            return Array.Empty<OsiLicense>();
+            throw new OsiApiException($"Failed to fetch filtered licenses for {paramName}={paramValue}", ex);
         }
 
         if (items is null || items.Length == 0)
@@ -446,7 +478,8 @@ public class OsiLicensesClient : IOsiLicensesClient
         var list = new List<OsiLicense>(items.Length);
         foreach (var license in items)
         {
-            if (TryGetLicenseKey(license, out var key)) _licenses.AddOrUpdate(key!, license, (_, _) => license);
+            if (_options.EnableCaching && TryGetLicenseKey(license, out var key))
+                _licenses.AddOrUpdate(key!, license, (_, _) => license);
 
             list.Add(license);
         }
@@ -488,10 +521,14 @@ public class OsiLicensesClient : IOsiLicensesClient
             await Task.WhenAll(tasks).ConfigureAwait(false);
             LoggerMethods.LogAllLicenseTextFetchOperationsCompletedForFilteredResults(_logger);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception)
         {
             LoggerMethods.LogSomeLicenseTextFetchOperationsFailedForFilteredResults(_logger);
-            /* ignore */
+            /* ignore, return what we have */
         }
 
         // Deterministic order

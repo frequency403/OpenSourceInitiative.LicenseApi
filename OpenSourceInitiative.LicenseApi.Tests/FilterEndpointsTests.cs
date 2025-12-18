@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
+using OpenSourceInitiative.LicenseApi.Exceptions;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
@@ -231,11 +232,17 @@ public class FilterEndpointsTests
         }));
         await using var client = new OsiLicensesClient(http);
 
-        // Act
-        var list = await call(client);
-
-        // Assert
-        list.Should().NotBeNull();
-        list.Should().HaveCount(expectedCount);
+        // Act & Assert
+        if (json == "__HTTP_500__")
+        {
+            var act = () => call(client);
+            await act.Should().ThrowAsync<OsiApiException>();
+        }
+        else
+        {
+            var list = await call(client);
+            list.Should().NotBeNull();
+            list.Should().HaveCount(expectedCount);
+        }
     }
 }

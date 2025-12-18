@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
+using OpenSourceInitiative.LicenseApi.Exceptions;
+using OpenSourceInitiative.LicenseApi.Options;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
@@ -71,17 +73,15 @@ public class OsiLicensesClientTests
     }
 
     [Fact]
-    public async Task GetAllLicensesAsync_FailSafeOnServerError_ReturnsSnapshot()
+    public async Task GetAllLicensesAsync_ThrowsOnServerError_InitialLoad()
     {
         // Arrange
         var (httpClient, _) = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         await using var client = new OsiLicensesClient(httpClient);
 
-        // Act
-        var result = await client.GetAllLicensesAsync();
-
-        // Assert
-        result.Should().BeEmpty(); // initial snapshot is empty
+        // Act & Assert
+        var act = () => client.GetAllLicensesAsync();
+        await act.Should().ThrowAsync<OsiApiException>();
     }
 
     [Fact]
@@ -111,5 +111,39 @@ public class OsiLicensesClientTests
         // Assert
         handler.TotalCalls.Should().BeGreaterThanOrEqualTo(1);
         second.Should().BeSameAs(first);
+    }
+
+    [Fact]
+    public async Task GetAllLicensesAsync_Refetches_WhenCachingDisabled()
+    {
+        // Arrange
+        var (httpClient, handler) = CreateClient(req =>
+        {
+            if (req.RequestUri!.ToString() != ApiBase)
+                return req.RequestUri!.ToString().Contains("/license/mit/")
+                    ? StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>")
+                    : new HttpResponseMessage(HttpStatusCode.NotFound);
+            const string json =
+                "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var options = new OsiClientOptions { EnableCaching = false };
+        await using var client = new OsiLicensesClient(httpClient, options);
+
+        // Act
+        var first = await client.GetAllLicensesAsync();
+        var second = await client.GetAllLicensesAsync();
+
+        // Assert
+        // Initial call: 1 (list) + 1 (text) = 2
+        // Second call: 1 (list) + 1 (text) = 2 (if it refetches everything)
+        // Wait, text is only refetched if LicenseText is empty. 
+        // In my implementation I clear _licenses, so it should refetch both.
+        handler.TotalCalls.Should().Be(4);
+        second.Should().NotBeSameAs(first);
     }
 }

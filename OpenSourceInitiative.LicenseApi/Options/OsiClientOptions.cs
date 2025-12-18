@@ -21,4 +21,9 @@ public sealed class OsiClientOptions
     ///     (e.g., for mocking or adding custom sockets/policies).
     /// </summary>
     public Func<HttpMessageHandler>? PrimaryHandlerFactory { get; set; }
+
+    /// <summary>
+    ///     Specifies whether in-memory caching is enabled. Defaults to <c>true</c>.
+    /// </summary>
+    public bool EnableCaching { get; set; } = true;
 }
