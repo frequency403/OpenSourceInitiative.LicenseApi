@@ -28,7 +28,22 @@ public static class ServiceCollectionExtensions
 
         var options = new OsiClientOptions();
         configure?.Invoke(options);
-        
+        var baseBuild  = services.AddHttpClient<IOsiClient, OsiClient>(client =>
+        {
+            client.BaseAddress ??= options.BaseAddress;
+            client.BaseAddress ??= options.BaseAddress;
+
+            // Ensure sensible defaults for public API access
+            if (client.DefaultRequestHeaders.Accept.Count == 0)
+                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            if (client.DefaultRequestHeaders.UserAgent.Count == 0)
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
+                client.DefaultRequestHeaders.UserAgent.Add(
+                    new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", version));
+            }
+        });
         var builder = services.AddHttpClient<IOsiLicensesClient, OsiLicensesClient>(client =>
         {
             client.BaseAddress ??= options.BaseAddress;
@@ -46,7 +61,11 @@ public static class ServiceCollectionExtensions
         });
 
         if (options.PrimaryHandlerFactory is not null)
+        {
+            baseBuild.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
             builder.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
+        }
+            
 
         return services;
     }

@@ -23,7 +23,7 @@ public class StreamingFallbackTests
                     // First attempt: return invalid JSON to trigger exception in streaming/primary path
                     return new HttpResponseMessage(HttpStatusCode.OK)
                     {
-                        Content = new StringContent("not-json", Encoding.UTF8, "application/json")
+                        Content = new StringContent("{\"not-json\"}", Encoding.UTF8, "application/json")
                     };
 
                 // Second attempt (fallback): return valid array

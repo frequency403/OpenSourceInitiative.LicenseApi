@@ -46,7 +46,9 @@ services.AddOsiLicensesClient(
 
 await using var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<IOsiLicensesClient>();
-
+var osiClient = provider.GetRequiredService<IOsiClient>();
+var license = await osiClient.GetByNameAsync("mit");
+var goons = await osiClient.GetByOsiIdAsync("mit");
 var allViaDi = await client.GetAllLicensesAsync();
 Console.WriteLine($"Loaded {allViaDi.Count} licenses (DI).\n");
 
