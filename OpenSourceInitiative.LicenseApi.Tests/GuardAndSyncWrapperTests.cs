@@ -2,22 +2,26 @@ using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
+using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class GuardAndSyncWrapperTests
 {
-    private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
+    private static (IOsiClient osiClient, StubHttpMessageHandler handler) CreateOsiClient(
+        Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
-        return new HttpClient(new StubHttpMessageHandler(responder));
+        var handler = new StubHttpMessageHandler(responder);
+        var http = new HttpClient(handler);
+        return (new OsiClient(httpClient: http), handler);
     }
 
     [Fact]
     public async Task Guards_Return_Empty_Or_Null()
     {
-        await using var client =
-            new OsiLicensesClient(CreateClient(_ => StubHttpMessageHandler.Status(HttpStatusCode.NotFound)));
+        var (osiClient, _) = CreateOsiClient(_ => StubHttpMessageHandler.Status(HttpStatusCode.NotFound));
+        await using var client = new OsiLicensesClient(osiClient);
 
         var searchEmpty = await client.SearchAsync("   ");
         Assert.Empty(searchEmpty);
@@ -32,7 +36,7 @@ public class GuardAndSyncWrapperTests
         var handler = new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-            if (uri.StartsWith("https://opensource.org/api/licenses?name="))
+            if (uri.StartsWith("https://opensource.org/api/license?name="))
             {
                 const string json =
                     "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
@@ -40,7 +44,7 @@ public class GuardAndSyncWrapperTests
                     { Content = new StringContent(json, Encoding.UTF8, "application/json") };
             }
 
-            if (uri.StartsWith("https://opensource.org/api/licenses?keyword=popular-strong-community"))
+            if (uri.StartsWith("https://opensource.org/api/license?keyword=popular-strong-community"))
             {
                 const string json =
                     "[{\"id\":\"mit\",\"name\":\"MIT\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
@@ -48,7 +52,7 @@ public class GuardAndSyncWrapperTests
                     { Content = new StringContent(json, Encoding.UTF8, "application/json") };
             }
 
-            if (uri.StartsWith("https://opensource.org/api/licenses?steward=eclipse-foundation"))
+            if (uri.StartsWith("https://opensource.org/api/license?steward=eclipse-foundation"))
             {
                 const string json =
                     "[{\"id\":\"epl-2.0\",\"name\":\"EPL\",\"spdx_id\":\"EPL-2.0\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/epl-2-0/\"},\"collection\":{\"href\":\"c\"}}}]";
@@ -56,7 +60,7 @@ public class GuardAndSyncWrapperTests
                     { Content = new StringContent(json, Encoding.UTF8, "application/json") };
             }
 
-            if (uri.StartsWith("https://opensource.org/api/licenses?spdx=gpl*"))
+            if (uri.StartsWith("https://opensource.org/api/license?spdx=gpl*"))
             {
                 const string json =
                     "[{\"id\":\"gpl-3.0\",\"name\":\"GPL\",\"spdx_id\":\"GPL-3.0-only\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/gpl-3-0/\"},\"collection\":{\"href\":\"c\"}}}]";
@@ -74,7 +78,8 @@ public class GuardAndSyncWrapperTests
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
         });
 
-        using var client = new OsiLicensesClient(new HttpClient(handler));
+        using var osiClient = new OsiClient(httpClient: new HttpClient(handler));
+        using var client = new OsiLicensesClient(osiClient);
 
         var byName = client.GetLicensesByName("mit");
         Assert.Single(byName);

@@ -1,10 +1,12 @@
+using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Models;
 
 namespace OpenSourceInitiative.LicenseApi.Interfaces;
 
 /// <summary>
-///     Defines the client for interacting with the Open Source Initiative (OSI) License API.
+///     Client for interacting with the Open Source Initiative (OSI) License API.
 ///     Provides methods to retrieve, filter, and stream license information.
+///     For any caching methods see <see cref="IOsiLicensesClient"/>.
 /// </summary>
 public interface IOsiClient : IDisposable, IAsyncDisposable
 {
@@ -64,9 +66,9 @@ public interface IOsiClient : IDisposable, IAsyncDisposable
     /// <summary>
     ///     Filters licenses based on specific classification keywords assigned by the OSI.
     /// </summary>
-    /// <param name="keyword">The keyword token (e.g., "popular-strong-community").</param>
+    /// <param name="keyword">The keyword token (<see cref="OsiLicenseKeyword"/>).</param>
     /// <returns>A collection of matching <see cref="OsiLicense"/> objects.</returns>
-    Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(string keyword);
+    Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword);
 
     /// <summary>
     ///     Filters licenses based on the steward (organization or entity) responsible for the license.

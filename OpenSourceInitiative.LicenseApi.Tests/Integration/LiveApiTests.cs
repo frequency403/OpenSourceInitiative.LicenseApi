@@ -1,4 +1,5 @@
 using OpenSourceInitiative.LicenseApi.Clients;
+using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Tests.Infrastructure;
 
 namespace OpenSourceInitiative.LicenseApi.Tests.Integration;
@@ -8,7 +9,8 @@ public class LiveApiTests
     [OsiApiAvailableFact]
     public async Task GetAllLicenses_Matches_Expectations()
     {
-        await using var client = new OsiLicensesClient();
+        await using var osiClient = new OsiClient();
+        await using var client = new OsiLicensesClient(osiClient);
         var all = await client.GetAllLicensesAsync(CancellationToken.None);
         Assert.NotNull(all);
         Assert.NotEmpty(all);
@@ -26,10 +28,12 @@ public class LiveApiTests
     [OsiApiAvailableFact]
     public async Task HtmlExtraction_Returns_Text()
     {
-        await using var client = new OsiLicensesClient();
-        var mit = await client.GetBySpdxAsync("MIT");
+        using var http = new HttpClient();
+        await using var osiClient = new OsiClient(httpClient: http);
+        var mit = await osiClient.GetByOsiIdAsync("mit");
         Assert.NotNull(mit);
-        Assert.NotNull(mit.LicenseText);
-        Assert.True(mit.LicenseText.Length > 0);
+        var text = await http.GetLicenseTextAsync(mit!);
+        Assert.NotNull(text);
+        Assert.True(text.Length > 0);
     }
 }

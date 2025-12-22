@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Options;
@@ -28,29 +29,15 @@ public static class ServiceCollectionExtensions
 
         var options = new OsiClientOptions();
         configure?.Invoke(options);
-        var baseBuild  = services.AddHttpClient<IOsiClient, OsiClient>(client =>
-        {
-            client.BaseAddress ??= options.BaseAddress;
-            client.BaseAddress ??= options.BaseAddress;
 
-            // Ensure sensible defaults for public API access
-            if (client.DefaultRequestHeaders.Accept.Count == 0)
-                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            if (client.DefaultRequestHeaders.UserAgent.Count == 0)
-            {
-                var assembly = Assembly.GetExecutingAssembly();
-                var version = assembly.GetName().Version?.ToString() ?? "1.0.0";
-                client.DefaultRequestHeaders.UserAgent.Add(
-                    new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", version));
-            }
-        });
-        var builder = services.AddHttpClient<IOsiLicensesClient, OsiLicensesClient>(client =>
+        // 1. Configure HttpClient for the underlying OsiClient
+        var clientBuilder = services.AddHttpClient("OsiClient", client =>
         {
             client.BaseAddress ??= options.BaseAddress;
 
-            // Ensure sensible defaults for public API access
-            if (client.DefaultRequestHeaders.Accept.Count == 0)
+            if (client.DefaultRequestHeaders.Accept.All(h => h.MediaType != "application/json"))
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
             if (client.DefaultRequestHeaders.UserAgent.Count == 0)
             {
                 var assembly = Assembly.GetExecutingAssembly();
@@ -62,10 +49,33 @@ public static class ServiceCollectionExtensions
 
         if (options.PrimaryHandlerFactory is not null)
         {
-            baseBuild.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
-            builder.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
+            clientBuilder.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
         }
-            
+
+        // 2. Register the appropriate IOsiClient
+        if (options.EnableCaching)
+        {
+            services.AddKeyedSingleton<IOsiClient, OsiClient>("OsiNonCachingClient", (sp, _) =>
+            {
+                var factory = sp.GetRequiredService<IHttpClientFactory>();
+                var httpClient = factory.CreateClient("OsiClient");
+                return new OsiClient(sp.GetService<ILogger<OsiClient>>(), options, httpClient);
+            });
+
+            services.AddSingleton<IOsiClient, OsiCachingClient>();
+        }
+        else
+        {
+            services.AddTransient<IOsiClient, OsiClient>(sp =>
+            {
+                var factory = sp.GetRequiredService<IHttpClientFactory>();
+                var httpClient = factory.CreateClient("OsiClient");
+                return new OsiClient(sp.GetService<ILogger<OsiClient>>(), options, httpClient);
+            });
+        }
+
+        // 3. Register IOsiLicensesClient
+        services.AddTransient<IOsiLicensesClient, OsiLicensesClient>();
 
         return services;
     }

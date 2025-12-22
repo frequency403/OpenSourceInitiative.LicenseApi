@@ -1,33 +1,46 @@
 #if !NETSTANDARD2_0
 using System.Net.Http.Json;
-#endif
+#else
 using System.Text.Json;
+#endif
+using System.Net.Http.Headers;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OpenSourceInitiative.LicenseApi.Converter;
+using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Options;
 
 namespace OpenSourceInitiative.LicenseApi.Clients;
 
-internal class OsiClient(
-    ILogger<OsiClient>? logger = null,
-    OsiClientOptions? options = null,
-    HttpClient? httpClient = null)
-    : IOsiClient
+public class OsiClient : IOsiClient
 {
     private const string AllLicensesEndpoint = "license";
-    private const string SingleLicenseEndpoint = "/{0}";
+    private const string SingleLicenseEndpoint = "license/{0}";
     private const string NameFilter = "name={0}";
     private const string KeywordFilter = "keyword={0}";
     private const string StewardFilter = "steward={0}";
     private const string SpdxFilter = "spdx={0}";
-    
-    private readonly HttpClient _httpClient = httpClient ?? new HttpClient
+
+    private readonly HttpClient _httpClient;
+    private readonly bool _disposeHttpClient;
+    private readonly OsiClientOptions _options;
+    private readonly ILogger<OsiClient> _logger;
+
+    public OsiClient(
+        ILogger<OsiClient>? logger = null,
+        OsiClientOptions? options = null,
+        HttpClient? httpClient = null)
     {
-        BaseAddress = options?.BaseAddress ?? new OsiClientOptions().BaseAddress
-    };
-    private readonly ILogger<OsiClient> _logger = logger ?? NullLogger<OsiClient>.Instance;
+        _options = options ?? new OsiClientOptions();
+        _httpClient = httpClient ?? new HttpClient();
+        _disposeHttpClient = httpClient == null;
+        _logger = logger ?? NullLogger<OsiClient>.Instance;
+
+        ConfigureHttpClient();
+    }
 
     /// <inheritdoc />
 #if !NETSTANDARD2_0
@@ -69,7 +82,7 @@ public Task<OsiLicense?> GetByOsiIdAsync(string id)
     /// <inheritdoc />
     public Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name) => GetLicenseBy(LicenseEndpointType.Name, name);
     /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(string keyword) => GetLicenseBy(LicenseEndpointType.Keyword, keyword);
+    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword) => GetLicenseBy(LicenseEndpointType.Keyword, OsiLicenseKeywordMapping.ToApiValue(keyword));
     /// <inheritdoc />
     public Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward) => GetLicenseBy(LicenseEndpointType.Steward, steward);
 
@@ -99,32 +112,39 @@ public Task<OsiLicense?> GetByOsiIdAsync(string id)
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
         }, value));
         _logger.LogTrace("Querying with {Query}", string.Join("", _httpClient.BaseAddress, query));
-        try
-        {
+
 #if !NETSTANDARD2_0
-            return await _httpClient.GetFromJsonAsync<IEnumerable<OsiLicense?>>(query) ?? [];
+        return await _httpClient.GetFromJsonAsync<IEnumerable<OsiLicense?>>(query) ?? [];
 #else
         var response = await _httpClient.GetAsync(query);
+        response.EnsureSuccessStatusCode();
         return (await JsonSerializer.DeserializeAsync<IEnumerable<OsiLicense?>>(await response.Content.ReadAsStreamAsync())) ?? [];
 #endif
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failed to get license by {LicenseEndpointType} {Value}", type, value);
-            return [];
-        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        _httpClient.Dispose();
+        if (_disposeHttpClient)
+            _httpClient.Dispose();
     }
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
-        _httpClient.Dispose();
+        if (_disposeHttpClient)
+            _httpClient.Dispose();
         return new ValueTask(Task.CompletedTask);
+    }
+
+    private void ConfigureHttpClient()
+    {
+        _httpClient.BaseAddress ??= _options.BaseAddress;
+
+        if (_httpClient.DefaultRequestHeaders.Accept.Count == 0)
+            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+            _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", "1.0"));
     }
 }

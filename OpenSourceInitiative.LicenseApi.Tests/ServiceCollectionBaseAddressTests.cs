@@ -38,6 +38,6 @@ public class ServiceCollectionBaseAddressTests
         var _ = await client.GetAllLicensesAsync();
 
         // Assert
-        firstUri.Should().Be("https://unit.test/api/licenses");
+        firstUri.Should().Be("https://unit.test/api/license");
     }
 }

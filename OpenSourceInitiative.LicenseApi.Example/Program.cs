@@ -13,19 +13,19 @@ using (var http = new HttpClient())
 {
     // Base address is optional; client defaults to https://opensource.org/api/
     http.BaseAddress = new Uri("https://opensource.org/api/");
-    await using (var direct = new OsiLicensesClient(http))
+    await using (var direct = new OsiClient(httpClient: http))
     {
-        var all = await direct.GetAllLicensesAsync();
+        var all = await direct.GetAllLicensesAsyncEnumerable().ToListAsync();
         Console.WriteLine($"Loaded {all.Count} licenses (direct).\n");
 
-        var mit = await direct.GetBySpdxAsync("MIT");
+        var mit = (await direct.GetBySpdxIdAsync("MIT")).FirstOrDefault();
         Console.WriteLine($"Lookup SPDX 'MIT': {(mit is null ? "not found" : mit.Name)}\n");
 
-        var search = await direct.SearchAsync("Apache");
+        var search = (await direct.GetByNameAsync("Apache")).ToList();
         Console.WriteLine($"Search 'Apache' returned {search.Count} result(s).\n");
 
         // New: server-side keyword filter using strongly-typed enum
-        var popular = await direct.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
+        var popular = (await direct.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity)).ToList();
         Console.WriteLine(
             $"Popular/strong-community licenses: {popular.Count} (first: {popular.FirstOrDefault()?.Name ?? "n/a"})\n");
     }
@@ -45,18 +45,15 @@ services.AddOsiLicensesClient(
 );
 
 await using var provider = services.BuildServiceProvider();
-var client = provider.GetRequiredService<IOsiLicensesClient>();
-var osiClient = provider.GetRequiredService<IOsiClient>();
-var license = await osiClient.GetByNameAsync("mit");
-var goons = await osiClient.GetByOsiIdAsync("mit");
-var allViaDi = await client.GetAllLicensesAsync();
+var client = provider.GetRequiredService<IOsiClient>();
+var allViaDi = await client.GetAllLicensesAsyncEnumerable().ToListAsync();
 Console.WriteLine($"Loaded {allViaDi.Count} licenses (DI).\n");
 
-var mitViaDi = client.GetBySpdx("MIT"); // sync variant
-Console.WriteLine($"Sync lookup SPDX 'MIT': {(mitViaDi is null ? "not found" : mitViaDi.Name)}\n");
+var mitViaDi = (await client.GetBySpdxIdAsync("MIT")).FirstOrDefault();
+Console.WriteLine($"Lookup SPDX 'MIT': {(mitViaDi is null ? "not found" : mitViaDi.Name)}\n");
 
 // Enum-based keyword filter via DI client
-var eclipsePopular = await client.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
+var eclipsePopular = (await client.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity)).ToList();
 Console.WriteLine($"Popular licenses via DI: {eclipsePopular.Count}\n");
 
 Console.WriteLine("Example completed.\n");

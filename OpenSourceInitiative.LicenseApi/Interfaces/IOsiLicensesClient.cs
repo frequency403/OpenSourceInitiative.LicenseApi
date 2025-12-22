@@ -5,7 +5,7 @@ using OpenSourceInitiative.LicenseApi.Models;
 namespace OpenSourceInitiative.LicenseApi.Interfaces;
 
 /// <summary>
-///     Contract for a lightweight client that interacts with the Open Source Initiative (OSI) License API.
+///     Lightweight caching client that interacts with the Open Source Initiative (OSI) License API.
 /// </summary>
 /// <remarks>
 ///     The client is designed to be resilient:
@@ -14,6 +14,7 @@ namespace OpenSourceInitiative.LicenseApi.Interfaces;
 ///     - Network calls throw library-specific exceptions on failure.
 ///     - Provides both asynchronous methods and synchronous counterparts for convenience.
 /// </remarks>
+[Obsolete("Use OsiLicensesClientV2 instead.")]
 public interface IOsiLicensesClient : IDisposable, IAsyncDisposable
 {
     /// <summary>

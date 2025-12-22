@@ -21,8 +21,8 @@ public class ServiceCollectionHeadersTests
         var handler = new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-            // Capture headers and the first API call to the licenses endpoint
-            if (firstApiUri is null && uri == "https://opensource.org/api/licenses")
+            // Capture headers and the first API call to the license endpoint
+            if (firstApiUri is null && uri == "https://opensource.org/api/license")
             {
                 firstApiUri = uri;
                 capturedAccept = req.Headers.Accept.ToArray();
@@ -54,7 +54,7 @@ public class ServiceCollectionHeadersTests
 
         // Assert
         licenses.Should().ContainSingle();
-        firstApiUri.Should().Be("https://opensource.org/api/licenses");
+        firstApiUri.Should().Be("https://opensource.org/api/license");
         capturedAccept.Should().NotBeNull();
         capturedAccept!.Should().Contain(x => x.MediaType == "application/json");
         capturedUa.Should().NotBeNull();

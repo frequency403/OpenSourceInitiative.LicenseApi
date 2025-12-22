@@ -1,17 +1,21 @@
 using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
+using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class SearchAndLookupTests
 {
-    private const string ApiBase = "https://opensource.org/api/licenses";
+    private const string ApiBase = "https://opensource.org/api/license";
 
-    private static HttpClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> responder)
+    private static (IOsiClient osiClient, StubHttpMessageHandler handler) CreateOsiClient(
+        Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
-        return new HttpClient(new StubHttpMessageHandler(responder));
+        var handler = new StubHttpMessageHandler(responder);
+        var http = new HttpClient(handler);
+        return (new OsiClient(httpClient: http), handler);
     }
 
     [Theory]
@@ -26,7 +30,7 @@ public class SearchAndLookupTests
             "{\"id\":\"apache-2.0\",\"name\":\"Apache License 2.0\",\"spdx_id\":\"Apache-2.0\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/apache-2-0/\"},\"collection\":{\"href\":\"c\"}}}"
         }) + "]";
 
-        var http = CreateClient(req =>
+        var (osiClient, _) = CreateOsiClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == ApiBase)
@@ -38,10 +42,10 @@ public class SearchAndLookupTests
                 return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
             if (uri.Contains("/license/apache-2-0/"))
                 return StubHttpMessageHandler.Html("<div class='license-content'>APACHE</div>");
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
+            return new HttpResponseMessage(HttpStatusCode.OK); // Text is no longer scraped by default
         });
 
-        await using var client = new OsiLicensesClient(http);
+        await using var client = new OsiLicensesClient(osiClient);
 
         // Act
         var all = await client.GetAllLicensesAsync();
@@ -62,10 +66,10 @@ public class SearchAndLookupTests
         // Arrange
         var json =
             "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
-        var http = CreateClient(req =>
+        var (osiClient, _) = CreateOsiClient(req =>
         {
             var uri = req.RequestUri!.ToString();
-            if (uri == ApiBase)
+            if (uri.StartsWith(ApiBase))
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(json, Encoding.UTF8, "application/json")
@@ -75,7 +79,7 @@ public class SearchAndLookupTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        await using var client = new OsiLicensesClient(http);
+        await using var client = new OsiLicensesClient(osiClient);
 
         // Act
         var licAsync = await client.GetBySpdxAsync("MIT");

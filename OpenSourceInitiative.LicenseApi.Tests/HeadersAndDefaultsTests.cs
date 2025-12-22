@@ -19,7 +19,7 @@ public class HeadersAndDefaultsTests
         }
 
         // Act
-        using var client = new OsiLicensesClient(http);
+        using var client = new OsiClient(httpClient: http);
 
         // Assert
         http.BaseAddress!.ToString().Should().Be("https://opensource.org/api/");
