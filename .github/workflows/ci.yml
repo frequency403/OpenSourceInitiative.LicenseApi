@@ -27,7 +27,7 @@ jobs:
     steps:
       - name: Decide
         id: decide
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             // PR events: always run (because you explicitly want opened/updated/reopened)
