@@ -17,11 +17,11 @@ public static class HttpClientExtensions
     /// <param name="license">The license whose <see cref="OsiLicenseLinks.Html" /> link is used.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Plain text content of the HTML node with class 'license-content', or an empty string if not found.</returns>
-    public static async Task<string> GetLicenseTextAsync(this HttpClient client, OsiLicense license,
+    internal static async Task<string> GetLicenseTextAsync(this HttpClient client, OsiLicense license,
         CancellationToken cancellationToken = default)
     {
         var stream = await client.GetStreamAsync(license.Links.Html.Href
-#if NET10_0_OR_GREATER
+#if !NETSTANDARD2_0
             , cancellationToken
 #endif
         );

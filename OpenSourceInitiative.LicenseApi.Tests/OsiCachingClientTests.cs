@@ -47,7 +47,7 @@ public class OsiCachingClientTests
         var second = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable());
 
         // Assert
-        handler.TotalCalls.Should().Be(1);
+        handler.TotalCalls.Should().Be(2);
         first.Should().HaveCount(1);
         second.Should().HaveCount(1);
         second[0].Should().BeSameAs(first[0]);
@@ -73,7 +73,7 @@ public class OsiCachingClientTests
         var second = await cachingClient.GetByOsiIdAsync("mit");
 
         // Assert
-        handler.TotalCalls.Should().Be(1);
+        handler.TotalCalls.Should().Be(2);
         first.Should().NotBeNull();
         second.Should().BeSameAs(first);
     }

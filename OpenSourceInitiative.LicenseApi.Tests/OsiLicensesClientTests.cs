@@ -68,9 +68,9 @@ public class OsiLicensesClientTests
         var mit = result.FirstOrDefault(x => x.SpdxId == "MIT");
         var ap2 = result.FirstOrDefault(x => x.SpdxId == "Apache-2.0");
         mit.Should().NotBeNull();
-        //mit!.LicenseText.Should().Be("MIT Text");
+        mit!.LicenseText.Should().Be("MIT Text");
         ap2.Should().NotBeNull();
-        //ap2!.LicenseText.Should().Be("Apache 2.0 Text");
+        ap2!.LicenseText.Should().Be("Apache 2.0 Text");
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public class OsiLicensesClientTests
         var second = await client.GetAllLicensesAsync();
 
         // Assert
-        handler.TotalCalls.Should().Be(1);
+        handler.TotalCalls.Should().Be(2);
         second.Should().BeEquivalentTo(first);
     }
 
@@ -128,7 +128,7 @@ public class OsiLicensesClientTests
         var second = await client.GetAllLicensesAsync();
 
         // Assert
-        handler.TotalCalls.Should().Be(2);
+        handler.TotalCalls.Should().Be(4);
         second.Should().BeEquivalentTo(first);
         second.Should().NotBeSameAs(first);
     }

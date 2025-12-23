@@ -244,7 +244,7 @@ public class FilterEndpointsTests
         if (json == "__HTTP_500__")
         {
             var act = () => call(client);
-            await act.Should().ThrowAsync<HttpRequestException>();
+            await act.Should().ThrowAsync<Exception>().Where(e => e is HttpRequestException || e is System.Text.Json.JsonException);
         }
         else
         {

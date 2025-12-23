@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenSourceInitiative.LicenseApi.Converter;
 using OpenSourceInitiative.LicenseApi.Enums;
+using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Options;
@@ -43,20 +44,27 @@ public class OsiClient : IOsiClient
     }
 
     /// <inheritdoc />
-#if !NETSTANDARD2_0
-     public IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable() =>
-        _httpClient.GetFromJsonAsAsyncEnumerable<OsiLicense>(AllLicensesEndpoint);
-#else
     public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()
     {
+#if !NETSTANDARD2_0
+     await foreach(var license in _httpClient.GetFromJsonAsAsyncEnumerable<OsiLicense>(AllLicensesEndpoint))
+#else
+    
         await foreach (var license in JsonSerializer.DeserializeAsyncEnumerable<OsiLicense?>(
                            await (await _httpClient.GetAsync(AllLicensesEndpoint)).Content.ReadAsStreamAsync()))
+#endif
         {
             _logger.LogTrace("Fetched license {License}", license);
+            if (license is null)
+            {
+                yield return license;
+                continue;
+            }
+            license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
             yield return license;
         }
     }
-#endif
+
     private enum LicenseEndpointType
     {
         SpdxId,
@@ -66,15 +74,17 @@ public class OsiClient : IOsiClient
     }
 
     /// <inheritdoc />
-#if !NETSTANDARD2_0
-public Task<OsiLicense?> GetByOsiIdAsync(string id)
-    {
-        return _httpClient.GetFromJsonAsync<OsiLicense?>(string.Format(SingleLicenseEndpoint, id));
-        #else
     public async Task<OsiLicense?> GetByOsiIdAsync(string id)
     {
-        return await JsonSerializer.DeserializeAsync<OsiLicense?>((await _httpClient.GetStreamAsync(string.Format(SingleLicenseEndpoint, id))));
+        var license =
+            #if !NETSTANDARD2_0
+            await _httpClient.GetFromJsonAsync<OsiLicense?>(string.Format(SingleLicenseEndpoint, id));
+        #else
+            await JsonSerializer.DeserializeAsync<OsiLicense?>((await _httpClient.GetStreamAsync(string.Format(SingleLicenseEndpoint, id))));
 #endif
+        if(license is null) return null;
+        license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
+        return license;
     }
     
     /// <inheritdoc />
@@ -113,13 +123,20 @@ public Task<OsiLicense?> GetByOsiIdAsync(string id)
         }, value));
         _logger.LogTrace("Querying with {Query}", string.Join("", _httpClient.BaseAddress, query));
 
-#if !NETSTANDARD2_0
-        return await _httpClient.GetFromJsonAsync<IEnumerable<OsiLicense?>>(query) ?? [];
-#else
-        var response = await _httpClient.GetAsync(query);
-        response.EnsureSuccessStatusCode();
-        return (await JsonSerializer.DeserializeAsync<IEnumerable<OsiLicense?>>(await response.Content.ReadAsStreamAsync())) ?? [];
-#endif
+        var licenseList = new List<OsiLicense?>();
+        foreach (var license in 
+                 #if !NETSTANDARD2_0
+                 await _httpClient.GetFromJsonAsync<IEnumerable<OsiLicense?>>(query)
+                 #else
+                 await JsonSerializer.DeserializeAsync<IEnumerable<OsiLicense?>>(await (await _httpClient.GetAsync(query)).Content.ReadAsStreamAsync())
+                 #endif
+                )
+        {
+            if(license is null) continue;
+            license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
+            licenseList.Add(license);
+        }
+        return licenseList;
     }
 
     /// <inheritdoc />

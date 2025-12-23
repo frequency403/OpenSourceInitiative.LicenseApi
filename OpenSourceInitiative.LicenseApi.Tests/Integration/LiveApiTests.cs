@@ -32,7 +32,7 @@ public class LiveApiTests
         await using var osiClient = new OsiClient(httpClient: http);
         var mit = await osiClient.GetByOsiIdAsync("mit");
         Assert.NotNull(mit);
-        var text = await http.GetLicenseTextAsync(mit!);
+        var text = mit!.LicenseText;
         Assert.NotNull(text);
         Assert.True(text.Length > 0);
     }
