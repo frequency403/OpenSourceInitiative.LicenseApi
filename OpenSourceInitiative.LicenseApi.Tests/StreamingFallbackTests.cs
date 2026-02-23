@@ -47,11 +47,10 @@ public class StreamingFallbackTests
         });
 
         await using var client = new OsiLicensesClient(new HttpClient(handler));
-        var list = await client.GetAllLicensesAsync();
-
-        Assert.Single(list);
-        Assert.Equal("MIT", list[0].SpdxId);
+        var list = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
+        list.ShouldHaveSingleItem();
+        list[0].SpdxId.ShouldBe("MIT");
         // On HTML failure, LicenseText should remain empty (fail-safe)
-        Assert.True(string.IsNullOrEmpty(list[0].LicenseText));
+        list[0].LicenseText.ShouldBeNullOrEmpty();
     }
 }

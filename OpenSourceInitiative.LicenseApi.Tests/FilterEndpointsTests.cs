@@ -191,9 +191,9 @@ public class FilterEndpointsTests
         var list = await call(client);
 
         // Assert
-        list.Should().NotBeNull();
-        list.Select(l => l.SpdxId).Should().BeEquivalentTo(expectedSpdxIds, o => o.WithoutStrictOrdering());
-        foreach (var kv in expectedTexts) list.First(l => l.SpdxId == kv.Key).LicenseText.Should().Be(kv.Value);
+        list.ShouldNotBeNull();
+        list.Select(l => l.SpdxId).OrderBy(x => x).ShouldBe(expectedSpdxIds.OrderBy(x => x));
+        foreach (var kv in expectedTexts) list.First(l => l.SpdxId == kv.Key).LicenseText.ShouldBe(kv.Value);
     }
 
     [Theory]
@@ -235,7 +235,7 @@ public class FilterEndpointsTests
         var list = await call(client);
 
         // Assert
-        list.Should().NotBeNull();
-        list.Should().HaveCount(expectedCount);
+        list.ShouldNotBeNull();
+        list.Count.ShouldBe(expectedCount);
     }
 }

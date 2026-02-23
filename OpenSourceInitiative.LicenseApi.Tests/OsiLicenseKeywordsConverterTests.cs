@@ -17,11 +17,10 @@ public class OsiLicenseKeywordsConverterTests
         ) + "}";
 
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
-        Assert.NotNull(lic);
-        Assert.Contains(OsiLicenseKeyword.PopularStrongCommunity, lic!.Keywords);
-        Assert.Contains(OsiLicenseKeyword.International, lic.Keywords);
-        Assert.DoesNotContain(lic.Keywords,
-            k => k.ToString().Equals("unknown-token", StringComparison.OrdinalIgnoreCase));
+        lic.ShouldNotBeNull();
+        lic.Keywords.ShouldContain(OsiLicenseKeyword.PopularStrongCommunity);
+        lic.Keywords.ShouldContain(OsiLicenseKeyword.International);
+        lic.Keywords.ShouldNotContain(k => k.ToString().Equals("unknown-token", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -41,7 +40,7 @@ public class OsiLicenseKeywordsConverterTests
         };
 
         var json = JsonSerializer.Serialize(lic);
-        Assert.Contains("\"keywords\":[\"special-purpose\",\"uncategorized\"]", json);
+        json.ShouldContain("\"keywords\":[\"special-purpose\",\"uncategorized\"]");
     }
 
     [Fact]
@@ -54,6 +53,7 @@ public class OsiLicenseKeywordsConverterTests
             "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
         ) + "}";
 
-        Assert.ThrowsAny<JsonException>(() => JsonSerializer.Deserialize<OsiLicense>(json));
+        var action = () => JsonSerializer.Deserialize<OsiLicense>(json);
+        action.ShouldThrow<JsonException>();
     }
 }

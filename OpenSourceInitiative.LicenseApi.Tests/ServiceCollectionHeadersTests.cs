@@ -50,15 +50,14 @@ public class ServiceCollectionHeadersTests
         var client = sp.GetRequiredService<IOsiLicensesClient>();
 
         // Act
-        var licenses = await client.GetAllLicensesAsync();
+        var licenses = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        licenses.Should().ContainSingle();
-        firstApiUri.Should().Be("https://opensource.org/api/licenses");
-        capturedAccept.Should().NotBeNull();
-        capturedAccept!.Should().Contain(x => x.MediaType == "application/json");
-        capturedUa.Should().NotBeNull();
-        capturedUa!.Should()
-            .Contain(x => x.Product != null && x.Product.Name == "OpenSourceInitiative-LicenseApi-Client");
+        licenses.ShouldHaveSingleItem();
+        firstApiUri.ShouldBe("https://opensource.org/api/licenses");
+        capturedAccept.ShouldNotBeNull();
+        capturedAccept.ShouldContain(x => x.MediaType == "application/json");
+        capturedUa.ShouldNotBeNull();
+        capturedUa.ShouldContain(x => x.Product != null && x.Product.Name == "OpenSourceInitiative-LicenseApi-Client");
     }
 }

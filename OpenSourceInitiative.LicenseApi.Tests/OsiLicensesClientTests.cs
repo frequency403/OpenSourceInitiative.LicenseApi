@@ -58,16 +58,16 @@ public class OsiLicensesClientTests
         await using var client = new OsiLicensesClient(httpClient);
 
         // Act
-        var result = await client.GetAllLicensesAsync();
+        var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.ShouldNotBeEmpty();
         var mit = result.FirstOrDefault(x => x.SpdxId == "MIT");
         var ap2 = result.FirstOrDefault(x => x.SpdxId == "Apache-2.0");
-        mit.Should().NotBeNull();
-        mit!.LicenseText.Should().Be("MIT Text");
-        ap2.Should().NotBeNull();
-        ap2!.LicenseText.Should().Be("Apache 2.0 Text");
+        mit.ShouldNotBeNull();
+        mit!.LicenseText.ShouldBe("MIT Text");
+        ap2.ShouldNotBeNull();
+        ap2!.LicenseText.ShouldBe("Apache 2.0 Text");
     }
 
     [Fact]
@@ -78,10 +78,10 @@ public class OsiLicensesClientTests
         await using var client = new OsiLicensesClient(httpClient);
 
         // Act
-        var result = await client.GetAllLicensesAsync();
+        var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        result.Should().BeEmpty(); // initial snapshot is empty
+        result.ShouldBeEmpty(); // initial snapshot is empty
     }
 
     [Fact]
@@ -105,11 +105,11 @@ public class OsiLicensesClientTests
         await using var client = new OsiLicensesClient(httpClient);
 
         // Act
-        var first = await client.GetAllLicensesAsync();
-        var second = await client.GetAllLicensesAsync();
+        var first = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
+        var second = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        handler.TotalCalls.Should().BeGreaterThanOrEqualTo(1);
-        second.Should().BeSameAs(first);
+        handler.TotalCalls.ShouldBeGreaterThanOrEqualTo(1);
+        second.ShouldBeSameAs(first);
     }
 }

@@ -22,10 +22,10 @@ public class HeadersAndDefaultsTests
         using var client = new OsiLicensesClient(http);
 
         // Assert
-        http.BaseAddress!.ToString().Should().Be("https://opensource.org/api/");
-        http.DefaultRequestHeaders.Accept.Should().ContainSingle();
-        http.DefaultRequestHeaders.Accept.First().MediaType.Should().Be(expectedAccept);
-        http.DefaultRequestHeaders.UserAgent.Should().ContainSingle();
-        http.DefaultRequestHeaders.UserAgent.First().Product!.Name.Should().Be(expectedUaName);
+        http.BaseAddress!.ToString().ShouldBe("https://opensource.org/api/");
+        http.DefaultRequestHeaders.Accept.ShouldHaveSingleItem();
+        http.DefaultRequestHeaders.Accept.First().MediaType.ShouldBe(expectedAccept);
+        http.DefaultRequestHeaders.UserAgent.ShouldHaveSingleItem();
+        http.DefaultRequestHeaders.UserAgent.First().Product!.Name.ShouldBe(expectedUaName);
     }
 }

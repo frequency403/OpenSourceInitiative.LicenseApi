@@ -17,7 +17,7 @@ public class DisposeBehaviorTests
         var act = () => client.Initialize();
 
         // Assert
-        act.Should().Throw<ObjectDisposedException>();
+        act.ShouldThrow<ObjectDisposedException>();
     }
 
     [Fact]
@@ -30,9 +30,9 @@ public class DisposeBehaviorTests
 
         // Act
         await client.DisposeAsync();
-        var resp = await externalHttp.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.com/"));
+        var resp = await externalHttp.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.com/"), TestContext.Current.CancellationToken);
 
         // Assert
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 }

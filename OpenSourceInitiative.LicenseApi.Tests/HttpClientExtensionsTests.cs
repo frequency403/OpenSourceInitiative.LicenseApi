@@ -21,9 +21,9 @@ public class HttpClientExtensionsTests
         };
 
         // Act
-        var text = await http.GetLicenseTextAsync(lic);
+        var text = await http.GetLicenseTextAsync(lic, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        text.Should().Be(expected);
+        text.ShouldBe(expected);
     }
 }

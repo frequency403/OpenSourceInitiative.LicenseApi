@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+// ReSharper disable ExplicitCallerInfoArgument
 
 namespace OpenSourceInitiative.LicenseApi.Tests.Infrastructure;
 
@@ -13,7 +14,7 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
 {
     private const string DefaultBaseUrl = "https://opensource.org/api/license";
 
-    public OsiApiAvailableFactAttribute()
+    public OsiApiAvailableFactAttribute(string? sourceFilePath = null, int sourceLineNumber = -1) : base(sourceFilePath, sourceLineNumber)
     {
         try
         {

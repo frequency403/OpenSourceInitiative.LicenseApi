@@ -32,10 +32,10 @@ public class InitializationTests
         });
 
         await using var client = new OsiLicensesClient(new HttpClient(handler));
-        await client.InitializeAsync();
-        await client.InitializeAsync(); // second call should be a no-op
+        await client.InitializeAsync(TestContext.Current.CancellationToken);
+        await client.InitializeAsync(TestContext.Current.CancellationToken); // second call should be a no-op
 
         // Only one base endpoint call should be necessary
-        Assert.Equal(1, calls);
+        calls.ShouldBe(1);
     }
 }

@@ -36,11 +36,11 @@ public class DependencyInjectionTests
         var client = provider.GetRequiredService<IOsiLicensesClient>();
 
         // Act
-        var licenses = await client.GetAllLicensesAsync();
+        var licenses = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        licenses.Should().ContainSingle();
-        licenses[0].SpdxId.Should().Be("MIT");
-        licenses[0].LicenseText.Should().Be("MIT");
+        licenses.ShouldHaveSingleItem();
+        licenses[0].SpdxId.ShouldBe("MIT");
+        licenses[0].LicenseText.ShouldBe("MIT");
     }
 }

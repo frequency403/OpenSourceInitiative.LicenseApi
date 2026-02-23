@@ -17,9 +17,9 @@ public class OsiLicenseKeywordsSerializationTests
         ) + "}";
 
         var lic = JsonSerializer.Deserialize<OsiLicense>(json);
-        Assert.NotNull(lic);
-        Assert.NotNull(lic.Keywords);
-        Assert.Contains(OsiLicenseKeyword.PopularStrongCommunity, lic.Keywords);
-        Assert.Contains(OsiLicenseKeyword.International, lic.Keywords);
+        lic.ShouldNotBeNull();
+        lic.Keywords.ShouldNotBeNull();
+        lic.Keywords.ShouldContain(OsiLicenseKeyword.PopularStrongCommunity);
+        lic.Keywords.ShouldContain(OsiLicenseKeyword.International);
     }
 }

@@ -10,17 +10,17 @@ public class LiveApiTests
     {
         await using var client = new OsiLicensesClient();
         var all = await client.GetAllLicensesAsync(CancellationToken.None);
-        Assert.NotNull(all);
-        Assert.NotEmpty(all);
+        all.ShouldNotBeNull();
+        all.ShouldNotBeEmpty();
 
         // Spot check known SPDX identifiers likely to exist
         var mit = await client.GetBySpdxAsync("MIT");
-        Assert.NotNull(mit);
-        Assert.False(string.IsNullOrWhiteSpace(mit.Name));
+        mit.ShouldNotBeNull();
+        string.IsNullOrWhiteSpace(mit.Name).ShouldBeFalse();
 
         // Search should return reasonable results
         var apache = await client.SearchAsync("Apache");
-        Assert.True(apache.Count > 0);
+        apache.Count.ShouldBeGreaterThan(0);
     }
 
     [OsiApiAvailableFact]
@@ -28,8 +28,8 @@ public class LiveApiTests
     {
         await using var client = new OsiLicensesClient();
         var mit = await client.GetBySpdxAsync("MIT");
-        Assert.NotNull(mit);
-        Assert.NotNull(mit.LicenseText);
-        Assert.True(mit.LicenseText.Length > 0);
+        mit.ShouldNotBeNull();
+        mit.LicenseText.ShouldNotBeNull();
+        mit.LicenseText.Length.ShouldBeGreaterThan(0);
     }
 }

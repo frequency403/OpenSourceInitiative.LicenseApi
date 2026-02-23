@@ -35,9 +35,9 @@ public class ServiceCollectionBaseAddressTests
         var client = sp.GetRequiredService<IOsiLicensesClient>();
 
         // Act
-        var _ = await client.GetAllLicensesAsync();
+        var _ = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        firstUri.Should().Be("https://unit.test/api/licenses");
+        firstUri.ShouldBe("https://unit.test/api/licenses");
     }
 }
