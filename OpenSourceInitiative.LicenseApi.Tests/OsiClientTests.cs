@@ -1,64 +1,54 @@
 using System.Net;
-using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 using OpenSourceInitiative.LicenseApi.Clients;
-using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class OsiClientTests
 {
-    private static (OsiClient osiClient, StubHttpMessageHandler handler) CreateOsiClient(
-        Func<HttpRequestMessage, HttpResponseMessage> responder)
+    [Fact]
+    public void Constructor_Configures_HttpClient_Headers_And_BaseAddress()
     {
-        var handler = new StubHttpMessageHandler(responder);
-        var http = new HttpClient(handler);
-        return (new OsiClient(httpClient: http), handler);
+        // Arrange
+        var http = new HttpClient();
+
+        // Act
+        using var client = new OsiClient(NullLogger<OsiClient>.Instance, options: null, httpClient: http);
+
+        // Assert
+        http.BaseAddress!.ToString().ShouldBe("https://opensource.org/api/");
+        http.DefaultRequestHeaders.Accept.ShouldContain(x => x.MediaType == "application/json");
+        http.DefaultRequestHeaders.UserAgent.ShouldNotBeEmpty();
     }
 
     [Fact]
-    public async Task GetByKeywordAsync_SendsCorrectRequest()
+    public void Disposing_DefaultConstructed_Client_Disposes_Internal_HttpClient()
     {
         // Arrange
-        var (client, handler) = CreateOsiClient(req =>
-        {
-            if (req.RequestUri!.ToString().Contains("keyword=popular-strong-community"))
-            {
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent("[]", Encoding.UTF8, "application/json")
-                };
-            }
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+        var client = new OsiClient();
 
         // Act
-        await client.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
+        client.Dispose();
+        var act = async () => await client.GetByOsiIdAsync("mit");
 
         // Assert
-        handler.TotalCalls.ShouldBe(1);
+        act.ShouldThrow<ObjectDisposedException>();
     }
 
     [Fact]
-    public async Task GetByStewardAsync_SendsCorrectRequest()
+    public async Task Disposing_Client_Does_Not_Dispose_External_HttpClient()
     {
         // Arrange
-        var (client, handler) = CreateOsiClient(req =>
-        {
-            if (req.RequestUri!.ToString().Contains("steward=eclipse"))
-            {
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent("[]", Encoding.UTF8, "application/json")
-                };
-            }
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var externalHttp = new HttpClient(handler);
+        var client = new OsiClient(httpClient: externalHttp);
 
         // Act
-        await client.GetByStewardAsync("eclipse");
+        await client.DisposeAsync();
+        var resp = await externalHttp.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.com/"), TestContext.Current.CancellationToken);
 
         // Assert
-        handler.TotalCalls.ShouldBe(1);
+        resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 }

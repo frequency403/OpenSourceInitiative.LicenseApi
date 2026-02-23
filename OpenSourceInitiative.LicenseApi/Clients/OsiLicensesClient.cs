@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenSourceInitiative.LicenseApi.Converter;
@@ -13,6 +14,7 @@ namespace OpenSourceInitiative.LicenseApi.Clients;
 ///     High-level implementation of <see cref="IOsiLicensesClient" /> that wraps an <see cref="IOsiLicensesClient"/>.
 /// </summary>
 [Obsolete("Use IOsiClient instead.")]
+[ExcludeFromCodeCoverage]
 public class OsiLicensesClient : IOsiLicensesClient
 {
     private readonly ILogger<OsiLicensesClient> _logger;

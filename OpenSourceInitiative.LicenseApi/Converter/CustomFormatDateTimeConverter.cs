@@ -11,8 +11,25 @@ namespace OpenSourceInitiative.LicenseApi.Converter;
 ///     The OSI API encodes dates such as submission date and approval date using the compact pattern yyyyMMdd.
 ///     This converter reads that representation as nullable <see cref="DateTime" /> and writes the same format.
 /// </remarks>
-internal class CustomFormatDateTimeConverter(string dateFormat = "yyyyMMdd") : JsonConverter<DateTime?>
+public class CustomFormatDateTimeConverter : JsonConverter<DateTime?>
 {
+    private readonly string _dateFormat;
+
+    /// <summary>
+    ///     Parameterless constructor for JSON deserialization via attributes.
+    /// </summary>
+    public CustomFormatDateTimeConverter() : this("yyyyMMdd")
+    {
+    }
+
+    /// <summary>
+    ///     Constructor for manual instantiation with a custom date format.
+    /// </summary>
+    private CustomFormatDateTimeConverter(string dateFormat)
+    {
+        _dateFormat = dateFormat;
+    }
+
     /// <inheritdoc />
     public override DateTime? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -23,17 +40,17 @@ internal class CustomFormatDateTimeConverter(string dateFormat = "yyyyMMdd") : J
         if (string.IsNullOrEmpty(dateString))
             return null;
 
-        return DateTime.TryParseExact(dateString, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None,
+        return DateTime.TryParseExact(dateString, _dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None,
             out var date)
             ? date
-            : throw new JsonException($"Unable to parse '{dateString}' as date in format {dateFormat}");
+            : throw new JsonException($"Unable to parse '{dateString}' as date in format {_dateFormat}");
     }
 
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, DateTime? value, JsonSerializerOptions options)
     {
         if (value.HasValue)
-            writer.WriteStringValue(value.Value.ToString(dateFormat, CultureInfo.InvariantCulture));
+            writer.WriteStringValue(value.Value.ToString(_dateFormat, CultureInfo.InvariantCulture));
         else
             writer.WriteNullValue();
     }

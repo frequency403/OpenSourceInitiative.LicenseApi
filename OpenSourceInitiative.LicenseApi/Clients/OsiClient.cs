@@ -138,18 +138,14 @@ internal class OsiClient : IOsiClient
 #endif
         )
         {
-            remoteLicenses.AsParallel().OfType<OsiLicense>().ForAll(async license =>
-            {
-                try
-                {
-                    license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "Error fetching license text for {LicenseId}", license?.Id);
-                }
-            });
-            return remoteLicenses;
+           var listOfLicensesWithLicenseText = new List<OsiLicense>();
+           foreach (var license in remoteLicenses)
+           {
+               if(license is null) continue;
+               license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
+               listOfLicensesWithLicenseText.Add(license);
+           }
+           return listOfLicensesWithLicenseText;
         }
         return [];
     }

@@ -1,29 +1,43 @@
 using System.Text.Json;
-using OpenSourceInitiative.LicenseApi.Models;
+using System.Text.Json.Serialization;
+using OpenSourceInitiative.LicenseApi.Converter;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class CustomFormatDateTimeConverterTests
 {
+    private static JsonSerializerOptions OptionsWithConverter()
+    {
+        var opts = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        };
+        opts.Converters.Add(new CustomFormatDateTimeConverter());
+        return opts;
+    }
+
+    private record Temp
+    {
+        [JsonPropertyName("submission_date")] public DateTime? SubmissionDate { get; init; }
+        [JsonPropertyName("approval_date")] public DateTime? ApprovalDate { get; init; }
+    }
+
     [Fact]
     public void Deserializes_Dates_In_yyyyMMdd_Format()
     {
         // Arrange
         var json = "{" + string.Join(',',
-            "\"id\":\"x\"",
-            "\"name\":\"Name\"",
             "\"submission_date\":\"20250201\"",
-            "\"approval_date\":\"20250302\"",
-            "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
+            "\"approval_date\":\"20250302\""
         ) + "}";
 
         // Act
-        var lic = JsonSerializer.Deserialize<OsiLicense>(json);
+        var obj = JsonSerializer.Deserialize<Temp>(json, OptionsWithConverter());
 
         // Assert
-        lic.ShouldNotBeNull();
-        lic!.SubmissionDate.ShouldBe(new DateTime(2025, 2, 1));
-        lic.ApprovalDate.ShouldBe(new DateTime(2025, 3, 2));
+        obj.ShouldNotBeNull();
+        obj!.SubmissionDate.ShouldBe(new DateTime(2025, 2, 1));
+        obj.ApprovalDate.ShouldBe(new DateTime(2025, 3, 2));
     }
 
     [Fact]
@@ -31,20 +45,17 @@ public class CustomFormatDateTimeConverterTests
     {
         // Arrange
         var json = "{" + string.Join(',',
-            "\"id\":\"x\"",
-            "\"name\":\"Name\"",
             "\"submission_date\":null",
-            "\"approval_date\":\"\"",
-            "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
+            "\"approval_date\":\"\""
         ) + "}";
 
         // Act
-        var lic = JsonSerializer.Deserialize<OsiLicense>(json);
+        var obj = JsonSerializer.Deserialize<Temp>(json, OptionsWithConverter());
 
         // Assert
-        lic.ShouldNotBeNull();
-        lic!.SubmissionDate.ShouldBeNull();
-        lic.ApprovalDate.ShouldBeNull();
+        obj.ShouldNotBeNull();
+        obj!.SubmissionDate.ShouldBeNull();
+        obj.ApprovalDate.ShouldBeNull();
     }
 
     [Fact]
@@ -52,14 +63,11 @@ public class CustomFormatDateTimeConverterTests
     {
         // Arrange
         var json = "{" + string.Join(',',
-            "\"id\":\"x\"",
-            "\"name\":\"Name\"",
-            "\"submission_date\":\"2025-02-01\"",
-            "\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"h\"},\"collection\":{\"href\":\"c\"}}"
+            "\"submission_date\":\"2025-02-01\""
         ) + "}";
 
         // Act
-        var act = () => JsonSerializer.Deserialize<OsiLicense>(json);
+        var act = () => JsonSerializer.Deserialize<Temp>(json, OptionsWithConverter());
 
         // Assert
         act.ShouldThrow<JsonException>();
@@ -69,22 +77,14 @@ public class CustomFormatDateTimeConverterTests
     public void Serializes_Dates_In_yyyyMMdd_Format()
     {
         // Arrange
-        var lic = new OsiLicense
+        var obj = new Temp
         {
-            Id = "x",
-            Name = "n",
             SubmissionDate = new DateTime(2024, 12, 31),
-            ApprovalDate = new DateTime(2025, 1, 1),
-            Links = new OsiLicenseLinks
-            {
-                Self = new OsiHref { Href = "s" },
-                Html = new OsiHref { Href = "h" },
-                Collection = new OsiHref { Href = "c" }
-            }
+            ApprovalDate = new DateTime(2025, 1, 1)
         };
 
         // Act
-        var json = JsonSerializer.Serialize(lic);
+        var json = JsonSerializer.Serialize(obj, OptionsWithConverter());
 
         // Assert
         json.ShouldContain("\"submission_date\":\"20241231\"");
