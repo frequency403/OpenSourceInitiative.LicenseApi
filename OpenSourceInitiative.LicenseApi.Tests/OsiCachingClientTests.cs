@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using OpenSourceInitiative.LicenseApi.Caches;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
@@ -37,14 +38,14 @@ public class OsiCachingClientTests
             };
         });
 
-        var cachingClient = new OsiCachingClient(baseClient);
+        var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
 
         // Act
         var first = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable());
         var second = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable());
 
         // Assert
-        handler.TotalCalls.ShouldBe(2);
+        handler.TotalCalls.ShouldBe(1);
         first.Count.ShouldBe(1);
         second.Count.ShouldBe(1);
         second[0].ShouldBeSameAs(first[0]);
@@ -63,14 +64,14 @@ public class OsiCachingClientTests
             };
         });
 
-        var cachingClient = new OsiCachingClient(baseClient);
+        var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
 
         // Act
         var first = await cachingClient.GetByOsiIdAsync("mit");
         var second = await cachingClient.GetByOsiIdAsync("mit");
 
         // Assert
-        handler.TotalCalls.ShouldBe(2);
+        handler.TotalCalls.ShouldBe(1);
         first.ShouldNotBeNull();
         second.ShouldBeSameAs(first);
     }
@@ -88,7 +89,7 @@ public class OsiCachingClientTests
             };
         });
 
-        var cachingClient = new OsiCachingClient(baseClient);
+        var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
 
         // Act
         await cachingClient.GetBySpdxIdAsync("MIT");

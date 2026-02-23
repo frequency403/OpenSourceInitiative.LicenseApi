@@ -6,13 +6,11 @@ namespace OpenSourceInitiative.LicenseApi.Interfaces;
 /// <summary>
 ///     Client for interacting with the Open Source Initiative (OSI) License API.
 ///     Provides methods to retrieve, filter, and stream license information.
-///     For any caching methods see <see cref="IOsiLicensesClient"/>.
 /// </summary>
 public interface IOsiClient : IDisposable, IAsyncDisposable
 {
     /// <summary>
     ///     Retrieves all available licenses from the OSI API as an asynchronous stream.
-    ///     This is memory-efficient for processing large sets of licenses.
     /// </summary>
     /// <returns>An <see cref="IAsyncEnumerable{OsiLicense}"/> of all registered licenses.</returns>
     IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable();

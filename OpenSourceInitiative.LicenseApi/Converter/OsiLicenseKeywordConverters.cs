@@ -45,7 +45,7 @@ internal static class OsiLicenseKeywordMapping
 ///     JSON converter for a single <see cref="OsiLicenseKeyword" /> value.
 /// </summary>
 [UsedImplicitly]
-public sealed class OsiLicenseKeywordConverter : JsonConverter<OsiLicenseKeyword>
+internal sealed class OsiLicenseKeywordConverter : JsonConverter<OsiLicenseKeyword>
 {
     public override OsiLicenseKeyword Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
@@ -64,8 +64,9 @@ public sealed class OsiLicenseKeywordConverter : JsonConverter<OsiLicenseKeyword
 /// <summary>
 ///     JSON converter for a list of <see cref="OsiLicenseKeyword" /> values.
 /// </summary>
-public sealed class OsiLicenseKeywordsConverter : JsonConverter<IReadOnlyCollection<OsiLicenseKeyword>>
+internal sealed class OsiLicenseKeywordsConverter : JsonConverter<IReadOnlyCollection<OsiLicenseKeyword>>
 {
+    /// <inheritdoc/>
     public override IReadOnlyCollection<OsiLicenseKeyword> Read(ref Utf8JsonReader reader, Type typeToConvert,
         JsonSerializerOptions options)
     {
@@ -95,6 +96,7 @@ public sealed class OsiLicenseKeywordsConverter : JsonConverter<IReadOnlyCollect
         return list.AsReadOnly();
     }
 
+    /// <inheritdoc/>
     public override void Write(Utf8JsonWriter writer, IReadOnlyCollection<OsiLicenseKeyword> value,
         JsonSerializerOptions options)
     {

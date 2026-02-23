@@ -10,8 +10,9 @@ using OpenSourceInitiative.LicenseApi.Exceptions;
 namespace OpenSourceInitiative.LicenseApi.Clients;
 
 /// <summary>
-///     High-level implementation of <see cref="IOsiLicensesClient" /> that wraps an <see cref="IOsiClient"/>.
+///     High-level implementation of <see cref="IOsiLicensesClient" /> that wraps an <see cref="IOsiLicensesClient"/>.
 /// </summary>
+[Obsolete("Use IOsiClient instead.")]
 public class OsiLicensesClient : IOsiLicensesClient
 {
     private readonly ILogger<OsiLicensesClient> _logger;

@@ -1,134 +1,138 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using OpenSourceInitiative.LicenseApi.Caches;
+using OpenSourceInitiative.LicenseApi.Converter;
 using OpenSourceInitiative.LicenseApi.Enums;
+using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Models;
 
 namespace OpenSourceInitiative.LicenseApi.Clients;
 
-public class OsiCachingClient([FromKeyedServices("OsiNonCachingClient")] IOsiClient client) : IOsiClient
+internal sealed class OsiCachingClient([FromKeyedServices(ServiceCollectionExtensions.OsiClientNonCachingName)] IOsiClient client, ILicenseCache cache) : IOsiClient
 {
-    private readonly ConcurrentDictionary<string, OsiLicense?> _osiIdCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, IEnumerable<OsiLicense?>> _queryCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<OsiLicense?> _licenses = new();
-    private readonly SemaphoreSlim _lock = new(1, 1);
-    private bool _allFetched;
+    private const string AllLicensesCacheKey = "all_licenses";
+    private const string OsiIdCacheKeyPrefix = "osi_id_";
+    private const string SpdxIdCacheKeyPrefix = "spdx_id_";
+    private const string NameCacheKeyPrefix = "name_";
+    private const string KeywordCacheKeyPrefix = "keyword_";
+    private const string StewardCacheKeyPrefix = "steward_";
 
+    /// <inheritdoc />
     public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()
     {
-        if (_allFetched)
+        var cached = await cache.GetAsync<List<OsiLicense?>>(AllLicensesCacheKey).ConfigureAwait(false);
+        if (cached != null)
         {
-            foreach (var license in _licenses) yield return license;
+            foreach (var license in cached)
+            {
+                yield return license;
+            }
             yield break;
         }
 
-        await _lock.WaitAsync();
-        try
+        var list = new List<OsiLicense?>();
+        await foreach (var license in client.GetAllLicensesAsyncEnumerable().ConfigureAwait(false))
         {
-            if (_allFetched)
-            {
-                foreach (var license in _licenses) yield return license;
-                yield break;
-            }
-
-            await foreach (var license in client.GetAllLicensesAsyncEnumerable())
-            {
-                if (license != null)
-                {
-                    UpdateCachesInternal(license);
-                }
-                yield return license;
-            }
-            _allFetched = true;
+            list.Add(license);
+            yield return license;
         }
-        finally
-        {
-            _lock.Release();
-        }
+        await cache.SetAsync(AllLicensesCacheKey, list).ConfigureAwait(false);
     }
 
-    private void UpdateCachesInternal(OsiLicense license)
-    {
-        if (_osiIdCache.TryAdd(license.Id, license))
-        {
-            _licenses.Add(license);
-        }
-    }
-
+    /// <inheritdoc />
     public async Task<OsiLicense?> GetByOsiIdAsync(string id)
     {
-        if (_osiIdCache.TryGetValue(id, out var license)) return license;
+        var key = OsiIdCacheKeyPrefix + id;
+        var cached = await cache.GetAsync<OsiLicense?>(key).ConfigureAwait(false);
+        if (cached != null) return cached;
 
-        await _lock.WaitAsync();
-        try
+        var license = await client.GetByOsiIdAsync(id).ConfigureAwait(false);
+        if (license != null)
         {
-            if (_osiIdCache.TryGetValue(id, out license)) return license;
-
-            license = await client.GetByOsiIdAsync(id);
-            if (license != null)
-            {
-                UpdateCachesInternal(license);
-            }
-            return license;
+            await cache.SetAsync(key, license).ConfigureAwait(false);
         }
-        finally
+        return license;
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id)
+    {
+        var key = SpdxIdCacheKeyPrefix + id;
+        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
+        if (cached != null) return cached;
+
+        var licenses = await client.GetBySpdxIdAsync(id).ConfigureAwait(false);
+        var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
+        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        return licenseList;
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name)
+    {
+        var key = NameCacheKeyPrefix + name;
+        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
+        if (cached != null) return cached;
+
+        var licenses = await client.GetByNameAsync(name).ConfigureAwait(false);
+        var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
+        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        return licenseList;
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword)
+    {
+        var key = KeywordCacheKeyPrefix + OsiLicenseKeywordMapping.ToApiValue(keyword);
+        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
+        if (cached != null) return cached;
+
+        var licenses = await client.GetByKeywordAsync(keyword).ConfigureAwait(false);
+        var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
+        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        return licenseList;
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward)
+    {
+        var key = StewardCacheKeyPrefix + steward;
+        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
+        if (cached != null) return cached;
+
+        var licenses = await client.GetByStewardAsync(steward).ConfigureAwait(false);
+        var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
+        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        return licenseList;
+    }
+    
+    private void Dispose(bool disposing)
+    {
+        if (disposing)
         {
-            _lock.Release();
+            client.Dispose();
         }
-    }
-
-    private async Task<IEnumerable<OsiLicense?>> GetOrFetchQueryAsync(string cacheKey, Func<Task<IEnumerable<OsiLicense?>>> fetcher)
-    {
-        if (_queryCache.TryGetValue(cacheKey, out var results)) return results;
-
-        await _lock.WaitAsync();
-        try
-        {
-            if (_queryCache.TryGetValue(cacheKey, out results)) return results;
-
-            results = (await fetcher()).ToList();
-            _queryCache[cacheKey] = results;
-            foreach (var license in results)
-            {
-                if (license != null) UpdateCachesInternal(license);
-            }
-            return results;
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
-
-    public Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id)
-    {
-        return GetOrFetchQueryAsync($"spdx:{id}", () => client.GetBySpdxIdAsync(id));
-    }
-
-    public Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name)
-    {
-        return GetOrFetchQueryAsync($"name:{name}", () => client.GetByNameAsync(name));
-    }
-
-    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword)
-    {
-        return GetOrFetchQueryAsync($"keyword:{keyword}", () => client.GetByKeywordAsync(keyword));
-    }
-
-    public Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward)
-    {
-        return GetOrFetchQueryAsync($"steward:{steward}", () => client.GetByStewardAsync(steward));
     }
 
     public void Dispose()
     {
-        _lock.Dispose();
-        client.Dispose();
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private async ValueTask DisposeAsyncCore()
+    {
+        await client.DisposeAsync().ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
     {
-        _lock.Dispose();
-        await client.DisposeAsync();
+        await DisposeAsyncCore();
+        GC.SuppressFinalize(this);
+    }
+
+    ~OsiCachingClient()
+    {
+        Dispose(false);
     }
 }

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using OpenSourceInitiative.LicenseApi.Caches;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
@@ -89,7 +90,7 @@ public class OsiLicensesClientTests
             };
         });
 
-        var cachingClient = new OsiCachingClient(baseClient);
+        var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
         await using var client = new OsiLicensesClient(cachingClient);
 
         // Act

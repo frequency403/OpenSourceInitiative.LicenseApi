@@ -3,8 +3,6 @@ using System.Net.Http.Json;
 #else
 using System.Text.Json;
 #endif
-using System.Net.Http.Headers;
-using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenSourceInitiative.LicenseApi.Converter;
@@ -16,7 +14,12 @@ using OpenSourceInitiative.LicenseApi.Options;
 
 namespace OpenSourceInitiative.LicenseApi.Clients;
 
-public class OsiClient : IOsiClient
+/// <summary>
+/// Provides functionality to interact with the Open Source Initiative (OSI) License API.
+/// The OsiClient allows searching, retrieving, and enumerating OSI-approved licenses
+/// using various parameters such as SPDX ID, name, keyword, and steward.
+/// </summary>
+internal class OsiClient : IOsiClient
 {
     private const string AllLicensesEndpoint = "license";
     private const string SingleLicenseEndpoint = "license/{0}";
@@ -37,19 +40,17 @@ public class OsiClient : IOsiClient
     {
         _options = options ?? new OsiClientOptions();
         _httpClient = httpClient ?? new HttpClient();
+        _httpClient.ConfigureForLicenseApi(_options);
         _disposeHttpClient = httpClient == null;
         _logger = logger ?? NullLogger<OsiClient>.Instance;
-
-        ConfigureHttpClient();
     }
 
     /// <inheritdoc />
     public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()
     {
 #if !NETSTANDARD2_0
-     await foreach(var license in _httpClient.GetFromJsonAsAsyncEnumerable<OsiLicense>(AllLicensesEndpoint))
+        await foreach (var license in _httpClient.GetFromJsonAsAsyncEnumerable<OsiLicense>(AllLicensesEndpoint))
 #else
-    
         await foreach (var license in JsonSerializer.DeserializeAsyncEnumerable<OsiLicense?>(
                            await (await _httpClient.GetAsync(AllLicensesEndpoint)).Content.ReadAsStreamAsync()))
 #endif
@@ -60,6 +61,7 @@ public class OsiClient : IOsiClient
                 yield return license;
                 continue;
             }
+
             license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
             yield return license;
         }
@@ -77,24 +79,29 @@ public class OsiClient : IOsiClient
     public async Task<OsiLicense?> GetByOsiIdAsync(string id)
     {
         var license =
-            #if !NETSTANDARD2_0
+#if !NETSTANDARD2_0
             await _httpClient.GetFromJsonAsync<OsiLicense?>(string.Format(SingleLicenseEndpoint, id));
-        #else
+#else
             await JsonSerializer.DeserializeAsync<OsiLicense?>((await _httpClient.GetStreamAsync(string.Format(SingleLicenseEndpoint, id))));
 #endif
-        if(license is null) return null;
+        if (license is null) return null;
         license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
         return license;
     }
-    
+
     /// <inheritdoc />
     public Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id) => GetLicenseBy(LicenseEndpointType.SpdxId, id);
+
     /// <inheritdoc />
     public Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name) => GetLicenseBy(LicenseEndpointType.Name, name);
+
     /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword) => GetLicenseBy(LicenseEndpointType.Keyword, OsiLicenseKeywordMapping.ToApiValue(keyword));
+    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword) =>
+        GetLicenseBy(LicenseEndpointType.Keyword, OsiLicenseKeywordMapping.ToApiValue(keyword));
+
     /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward) => GetLicenseBy(LicenseEndpointType.Steward, steward);
+    public Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward) =>
+        GetLicenseBy(LicenseEndpointType.Steward, steward);
 
     /// <summary>
     /// Retrieves a collection of licenses matching the specified criteria.
@@ -123,20 +130,28 @@ public class OsiClient : IOsiClient
         }, value));
         _logger.LogTrace("Querying with {Query}", string.Join("", _httpClient.BaseAddress, query));
 
-        var licenseList = new List<OsiLicense?>();
-        foreach (var license in 
-                 #if !NETSTANDARD2_0
-                 await _httpClient.GetFromJsonAsync<IEnumerable<OsiLicense?>>(query)
-                 #else
-                 await JsonSerializer.DeserializeAsync<IEnumerable<OsiLicense?>>(await (await _httpClient.GetAsync(query)).Content.ReadAsStreamAsync())
-                 #endif
-                )
+        if (
+#if !NETSTANDARD2_0
+            (await _httpClient.GetFromJsonAsync<OsiLicense?[]?>(query)) is { } remoteLicenses
+#else
+            (await JsonSerializer.DeserializeAsync<OsiLicense?[]?>(await (await _httpClient.GetAsync(query)).Content.ReadAsStreamAsync())) is { } remoteLicenses
+#endif
+        )
         {
-            if(license is null) continue;
-            license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
-            licenseList.Add(license);
+            remoteLicenses.AsParallel().OfType<OsiLicense>().ForAll(async license =>
+            {
+                try
+                {
+                    license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Error fetching license text for {LicenseId}", license?.Id);
+                }
+            });
+            return remoteLicenses;
         }
-        return licenseList;
+        return [];
     }
 
     /// <inheritdoc />
@@ -152,16 +167,5 @@ public class OsiClient : IOsiClient
         if (_disposeHttpClient)
             _httpClient.Dispose();
         return new ValueTask(Task.CompletedTask);
-    }
-
-    private void ConfigureHttpClient()
-    {
-        _httpClient.BaseAddress ??= _options.BaseAddress;
-
-        if (_httpClient.DefaultRequestHeaders.Accept.Count == 0)
-            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
-            _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("OpenSourceInitiative-LicenseApi-Client", "1.0"));
     }
 }
