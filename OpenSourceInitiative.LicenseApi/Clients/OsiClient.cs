@@ -19,7 +19,7 @@ namespace OpenSourceInitiative.LicenseApi.Clients;
 /// The OsiClient allows searching, retrieving, and enumerating OSI-approved licenses
 /// using various parameters such as SPDX ID, name, keyword, and steward.
 /// </summary>
-internal class OsiClient : IOsiClient
+public class OsiClient : IOsiClient
 {
     private const string AllLicensesEndpoint = "license";
     private const string SingleLicenseEndpoint = "license/{0}";

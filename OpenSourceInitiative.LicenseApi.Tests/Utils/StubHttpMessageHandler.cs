@@ -17,14 +17,6 @@ public sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponse
         return Task.FromResult(_responder(request));
     }
 
-    public static HttpResponseMessage JsonNdjson(string content)
-    {
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(content, Encoding.UTF8, "application/x-ndjson")
-        };
-    }
-
     public static HttpResponseMessage Html(string html)
     {
         return new HttpResponseMessage(HttpStatusCode.OK)

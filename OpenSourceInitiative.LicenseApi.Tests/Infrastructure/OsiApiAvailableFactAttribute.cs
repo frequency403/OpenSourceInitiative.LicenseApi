@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 // ReSharper disable ExplicitCallerInfoArgument
@@ -19,8 +20,8 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
     {
         try
         {
-            var force = Environment.GetEnvironmentVariable("OSI_API_TESTS");
-            if (string.Equals(force, "1", StringComparison.Ordinal)) return; // do not skip; user opted in explicitly
+            if (int.TryParse(Environment.GetEnvironmentVariable("OSI_API_TESTS"), out var parsedInt) && parsedInt is 1) 
+                return;
 
             // Quick TCP reachability check on port 443 to avoid HTTP stack overhead
             var host = new Uri(DefaultBaseUrl).Host;

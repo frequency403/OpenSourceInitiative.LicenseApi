@@ -83,8 +83,10 @@ public class DependencyInjectionTests
 
         // Act
         var nonCaching = sp.GetRequiredKeyedService<IOsiClient>("OsiNonCachingClient");
+        var caching = sp.GetRequiredService<IOsiClient>();
 
         // Assert
         nonCaching.ShouldBeOfType<OsiClient>();
+        caching.ShouldBeOfType<OsiCachingClient>();
     }
 }

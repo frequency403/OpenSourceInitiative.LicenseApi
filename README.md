@@ -3,172 +3,117 @@
 [![CI](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml/badge.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A lightweight, resilient .NET client for the Open Source Initiative (OSI) License API, with built‑in Dependency
-Injection (DI) extensions.
+A lightweight and resilient .NET client for the Open Source Initiative (OSI) License API. This library provides a structured way to query OSI-approved licenses, including streaming support and automatic license text extraction.
 
-This repository contains:
+## Features
 
-* OpenSourceInitiative.LicenseApi — the core typed client to query OSI licenses (includes DI registration extensions)
-* OpenSourceInitiative.LicenseApi.Example — a small console app demonstrating direct and DI usage
-* OpenSourceInitiative.LicenseApi.Tests — unit and integration tests
+* **Streaming API**: Support for `IAsyncEnumerable` to stream licenses, reducing memory usage when processing the full catalog.
+* **License Text Extraction**: Automatically fetches and extracts clean, human-readable plain text from official OSI license HTML pages.
+* **Extensible Caching**: Flexible caching layer supporting `IMemoryCache`, `IDistributedCache`, or a thread-safe in-memory fallback.
+* **Comprehensive Filtering**: Query licenses by name, keyword, steward, or SPDX identifier (supporting wildcard patterns).
+* **Strongly Typed**: Full mapping of OSI license metadata and classification keywords.
+* **Resilient**: Designed for modern .NET with async-first patterns and minimal allocations.
 
-## Why this library?
+## Installation
 
-* Fetches the OSI license catalog and extracts human‑readable license text from the HTML page of each license
-* Keeps an in‑memory, thread‑safe cache once data is loaded; subsequent queries operate on the snapshot
-* Fail‑safe networking: on errors, you get the last available snapshot (possibly empty) instead of exceptions bubbling
-  up
-* Async API with synchronous counterparts for convenient use across environments
-* Server‑side filtering endpoints supported (name, keyword, steward, SPDX wildcard pattern)
-* Strongly‑typed keyword filtering via `OsiLicenseKeyword` enum
+Install via NuGet:
 
-## Install
+```bash
+dotnet add package OpenSourceInitiative.LicenseApi
+```
 
-Core client:
-
- ```bash
- dotnet add package OpenSourceInitiative.LicenseApi
- ```
-
-Dependency Injection: built‑in via `ServiceCollection` extensions — no extra package needed.
-
-Targets: `net10.0`, `netstandard2.0` (broad platform compatibility)
+Targets: `net10.0`, `netstandard2.0`
 
 ## Quickstart
 
-### 1) Direct usage (no DI)
+### 1. Direct Usage (No Dependency Injection)
 
- ```csharp
- using OpenSourceInitiative.LicenseApi.Clients;
+```csharp
+using OpenSourceInitiative.LicenseApi.Clients;
 
- using var http = new HttpClient { BaseAddress = new Uri("https://opensource.org/api/") }; // optional; defaults to this
- await using var client = new OsiLicensesClient(http);
+// Create a client instance
+using var client = new OsiClient();
 
- // Load all
- var licenses = await client.GetAllLicensesAsync();
+// Stream all licenses
+await foreach (var license in client.GetAllLicensesAsyncEnumerable())
+{
+    Console.WriteLine($"{license.SpdxId}: {license.Name}");
+}
 
- // Search by name or id (cached, case-insensitive)
- var apache = await client.SearchAsync("Apache");
+// Search by SPDX ID (supports wildcards)
+var gplLicenses = await client.GetBySpdxIdAsync("GPL*");
+```
 
- // Lookup by SPDX (sync/async)
- var mit = client.GetBySpdx("MIT");
- var mitAsync = await client.GetBySpdxAsync("MIT");
+### 2. Dependency Injection
 
- // Server-side filters
- var byName = await client.GetLicensesByNameAsync("mit");
- var bySteward = await client.GetLicensesByStewardAsync("eclipse-foundation");
- var bySpdxPattern = await client.GetLicensesBySpdxPatternAsync("gpl*");
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using OpenSourceInitiative.LicenseApi.Extensions;
+using OpenSourceInitiative.LicenseApi.Interfaces;
 
- // Strongly-typed keyword filter
- var popular = await client.GetLicensesByKeywordAsync(OpenSourceInitiative.LicenseApi.Enums.OsiLicenseKeyword.PopularStrongCommunity);
- ```
+var services = new ServiceCollection();
 
-### 2) Using Dependency Injection
+// Register the OSI client with caching enabled
+services.AddOsiLicensesClient(options =>
+{
+    options.EnableCaching = true;
+});
 
- ```csharp
- using Microsoft.Extensions.DependencyInjection;
- using Microsoft.Extensions.Logging;
- using OpenSourceInitiative.LicenseApi.Extensions;
- using OpenSourceInitiative.LicenseApi.Interfaces;
+var provider = services.BuildServiceProvider();
+var client = provider.GetRequiredService<IOsiClient>();
 
- var services = new ServiceCollection();
- services.AddLogging(b => b.AddConsole());
+// Get a license by its OSI identifier
+var mit = await client.GetByOsiIdAsync("mit");
+```
 
- services.AddOsiLicensesClient(o =>
- {
-     // o.BaseAddress = new Uri("https://opensource.org/api/"); // optional (this is the default)
- });
+## API Reference
 
- await using var provider = services.BuildServiceProvider();
- var client = provider.GetRequiredService<IOsiLicensesClient>();
+### `IOsiClient`
 
- var all = await client.GetAllLicensesAsync();
- var mit = await client.GetBySpdxAsync("MIT");
- var search = client.Search("Apache"); // sync variant
- ```
+The primary interface for interacting with the OSI API.
 
-See a runnable demo in `OpenSourceInitiative.LicenseApi.Example`.
+* `IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()`: Streams all registered licenses.
+* `Task<OsiLicense?> GetByOsiIdAsync(string id)`: Retrieves a single license by its OSI ID (e.g., `mit`).
+* `Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id)`: Filters by SPDX ID. Supports `*` wildcards.
+* `Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name)`: Filters by name or partial name match.
+* `Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword)`: Filters by OSI classification keyword.
+* `Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward)`: Filters by the organization responsible for the license.
 
-## API at a glance
+### Caching
 
-The main abstraction is `IOsiLicensesClient` with both async and sync methods:
-
-* Initialization/cache
-    * `Task InitializeAsync(CancellationToken)` / `void Initialize()`
-    * `IReadOnlyList<OsiLicense> Licenses` — current immutable snapshot
-* Catalog and search
-    * `Task<IReadOnlyList<OsiLicense>> GetAllLicensesAsync(...)`
-    * `Task<IReadOnlyList<OsiLicense>> SearchAsync(string query, ...)` and
-      `IReadOnlyList<OsiLicense> Search(string query)`
-    * `Task<OsiLicense?> GetBySpdxAsync(string spdxId, ...)` and `OsiLicense? GetBySpdx(string spdxId)`
-* Server‑side filters (per OSI API)
-    * `GetLicensesByNameAsync(string name, ...)`
-    * `GetLicensesByKeywordAsync(string keyword, ...)` and `GetLicensesByKeywordAsync(OsiLicenseKeyword keyword, ...)`
-    * `GetLicensesByStewardAsync(string steward, ...)`
-    * `GetLicensesBySpdxPatternAsync(string spdxPattern, ...)` (supports `*` wildcards)
+Caching is enabled by default when using Dependency Injection. The library automatically detects and uses:
+1. `IDistributedCache` (if registered)
+2. `IMemoryCache` (if registered)
+3. Internal thread-safe `ConcurrentDictionary` (fallback)
 
 ## Models
 
-`OsiLicense` (selected properties):
+### `OsiLicense`
 
-* `string Id` — OSI unique identifier
-* `string Name` — human‑readable license name
-* `string? SpdxId` — SPDX id, e.g., `MIT`, `Apache-2.0`
-* `string? Version`
-* `DateTime? SubmissionDate`, `string? SubmissionUrl`, `string? SubmitterName`
-* `bool Approved`, `DateTime? ApprovalDate`
-* `List<string> Stewards`
-* `List<OsiLicenseKeyword> Keywords` — mapped from OSI keyword tokens
-* `OsiLicenseLinks Links` — links to self page, public HTML page, and collection
-* `string LicenseText` — extracted plaintext of the license HTML page
+Key properties include:
 
-Keyword enum (`OsiLicenseKeyword`) covers OSI classifications, including:
-`PopularStrongCommunity`, `International`, `SpecialPurpose`, `NonReusable`, `Superseded`, `VoluntarilyRetired`,
-`RedundantWithMorePopular`, `OtherMiscellaneous`, `Uncategorized`.
+* `Id`: Unique OSI identifier.
+* `Name`: Full human-readable name.
+* `SpdxId`: Standard SPDX identifier.
+* `LicenseText`: Plain text content extracted from the license HTML page.
+* `Keywords`: Collection of `OsiLicenseKeyword` classification tokens.
+* `Approved`: Boolean indicating OSI approval status.
+* `Links`: Metadata links to the API and official HTML representation.
 
-## Configuration (DI)
+## Build and Test
 
-When using `AddOsiLicensesClient(...)` you can configure:
-
-* `BaseAddress` — defaults to `https://opensource.org/api/`
-* `PrimaryHandlerFactory` — supply a custom `HttpMessageHandler` (e.g., for tests)
-
-## Example project
-
-* `OpenSourceInitiative.LicenseApi.Example/Program.cs` demonstrates direct and DI usage, search, SPDX lookup, and
-  keyword filtering.
-
-## Build, test, and CI
-
-* Build locally: `dotnet build -c Release`
-* Run tests: `dotnet test -c Release`
-* CI: GitHub Actions builds on Ubuntu, Windows, and macOS with .NET SDK 9 and 10, runs tests with line coverage
-  threshold and uploads Cobertura coverage artifacts.
-
-Some integration tests hit the live OSI API (see `OpenSourceInitiative.LicenseApi.Tests/Integration`). They are
-decorated to run only when the API is reachable.
-
-## Repository layout
-
-* `OpenSourceInitiative.LicenseApi/` — core library (see its [README](OpenSourceInitiative.LicenseApi/README.md))
-* `OpenSourceInitiative.LicenseApi.Example/` — runnable example
-* `OpenSourceInitiative.LicenseApi.Tests/` — unit and integration tests
-
-## Versioning
-
-The project follows semantic versioning. Public API changes will result in a major version bump.
+* **Build**: `dotnet build -c Release`
+* **Test**: `dotnet test -c Release` (Requires coverage ≥ 75%)
 
 ## Contributing
 
-Issues and pull requests are welcome. If you contribute, please:
+Issues and pull requests are welcome. Please ensure:
+* Code style remains consistent.
+* New features are covered by tests.
+* Branching follows [GitFlow](https://nvie.com/posts/a-successful-git-branching-model/).
+* Contributors are added to the list below.
 
-* Add or update tests
-* Keep code style consistent with the surrounding code
-* Ensure `dotnet test` passes (CI enforces coverage ≥ 75% lines)
-* Add yourself to the list of contributors in [README.md](README.md)
-* Conform branching style to [GitFlow](https://nvie.com/posts/a-successful-git-branching-model/)
-
-See also: [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for more details.
 
 ## License
 
@@ -176,15 +121,8 @@ MIT — see [LICENSE](LICENSE).
 
 ## Acknowledgements
 
-* Data is provided by the Open Source Initiative (OSI) License API.
-
-## Community & Docs
-
-- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
-- Security policy: [SECURITY.md](SECURITY.md)
-- Support: [SUPPORT.md](SUPPORT.md)
-- Changelog: [CHANGELOG.md](CHANGELOG.md)
+Data is provided by the [Open Source Initiative (OSI) License API](https://opensource.org/api/).
 
 ## Contributors
+
 * Oliver Schantz ([frequency403](https://github.com/frequency403))
