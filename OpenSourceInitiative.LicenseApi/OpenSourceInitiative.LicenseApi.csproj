@@ -7,7 +7,6 @@
         <LangVersion>latest</LangVersion>
         <Description>Lightweight client for the Open Source Initiative (OSI) License API. Fetches OSI license catalog and extracts human-readable license text from the HTML pages. Designed to be resilient and allocation-friendly. Multi-targets net10.0 and netstandard2.0.</Description>
         <PackageTags>OSI;Open Source Initiative;License;SPDX;License API;OpenSource</PackageTags>
-        <Version>2.0.0</Version>
     </PropertyGroup>
 
     <ItemGroup>
