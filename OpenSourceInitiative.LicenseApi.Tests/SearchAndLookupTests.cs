@@ -48,16 +48,18 @@ public class SearchAndLookupTests
         await using var client = new OsiLicensesClient(osiClient);
 
         // Act
-        var all = await client.GetAllLicensesAsync();
-        var results = await client.SearchAsync(query);
+        var all = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
+        var results = await client.SearchAsync(query, TestContext.Current.CancellationToken);
+        // ReSharper disable MethodHasAsyncOverload
         var syncResults = client.Search(query); // sync wrapper
         var allSync = client.GetAllLicenses(); // sync wrapper for GetAll
+        // ReSharper restore MethodHasAsyncOverload
 
         // Assert
-        all.Count.Should().Be(2);
-        results.Should().ContainSingle().Which.SpdxId.Should().Be(expectedSpdx);
-        syncResults.Should().ContainSingle().Which.SpdxId.Should().Be(expectedSpdx);
-        allSync.Count.Should().Be(2);
+        all.Count.ShouldBe(2);
+        results.ShouldHaveSingleItem().SpdxId.ShouldBe(expectedSpdx);
+        syncResults.ShouldHaveSingleItem().SpdxId.ShouldBe(expectedSpdx);
+        allSync.Count.ShouldBe(2);
     }
 
     [Fact]
@@ -82,13 +84,15 @@ public class SearchAndLookupTests
         await using var client = new OsiLicensesClient(osiClient);
 
         // Act
-        var licAsync = await client.GetBySpdxAsync("MIT");
+        var licAsync = await client.GetBySpdxAsync("MIT", TestContext.Current.CancellationToken);
+        // ReSharper disable MethodHasAsyncOverload
         var licSync = client.GetBySpdx("MIT"); // sync variant
+        // ReSharper restore MethodHasAsyncOverload
 
         // Assert
-        licAsync.Should().NotBeNull();
-        licAsync!.SpdxId.Should().Be("MIT");
-        licSync.Should().NotBeNull();
-        licSync!.SpdxId.Should().Be("MIT");
+        licAsync.ShouldNotBeNull();
+        licAsync!.SpdxId.ShouldBe("MIT");
+        licSync.ShouldNotBeNull();
+        licSync!.SpdxId.ShouldBe("MIT");
     }
 }

@@ -23,11 +23,11 @@ public class GuardAndSyncWrapperTests
         var (osiClient, _) = CreateOsiClient(_ => StubHttpMessageHandler.Status(HttpStatusCode.NotFound));
         await using var client = new OsiLicensesClient(osiClient);
 
-        var searchEmpty = await client.SearchAsync("   ");
-        Assert.Empty(searchEmpty);
+        var searchEmpty = await client.SearchAsync("   ", TestContext.Current.CancellationToken);
+        searchEmpty.ShouldBeEmpty();
 
-        var bySpdxEmpty = await client.GetBySpdxAsync("\t\n");
-        Assert.Null(bySpdxEmpty);
+        var bySpdxEmpty = await client.GetBySpdxAsync("\t\n", TestContext.Current.CancellationToken);
+        bySpdxEmpty.ShouldBeNull();
     }
 
     [Fact]
@@ -82,15 +82,15 @@ public class GuardAndSyncWrapperTests
         using var client = new OsiLicensesClient(osiClient);
 
         var byName = client.GetLicensesByName("mit");
-        Assert.Single(byName);
+        byName.ShouldHaveSingleItem();
 
         var byKeywordEnum = client.GetLicensesByKeyword(OsiLicenseKeyword.PopularStrongCommunity);
-        Assert.Single(byKeywordEnum);
+        byKeywordEnum.ShouldHaveSingleItem();
 
         var bySteward = client.GetLicensesBySteward("eclipse-foundation");
-        Assert.Single(bySteward);
+        bySteward.ShouldHaveSingleItem();
 
         var bySpdxPattern = client.GetLicensesBySpdxPattern("gpl*");
-        Assert.Single(bySpdxPattern);
+        bySpdxPattern.ShouldHaveSingleItem();
     }
 }

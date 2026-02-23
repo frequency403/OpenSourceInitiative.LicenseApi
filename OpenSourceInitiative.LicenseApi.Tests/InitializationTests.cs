@@ -14,7 +14,7 @@ public class InitializationTests
         var handler = new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/license")
+            if (uri == "https://opensource.org/api/licenses")
             {
                 calls++;
                 const string json =
@@ -31,12 +31,11 @@ public class InitializationTests
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
         });
 
-        var osiClient = new OsiClient(httpClient: new HttpClient(handler));
-        await using var client = new OsiLicensesClient(osiClient);
-        await client.InitializeAsync();
-        await client.InitializeAsync(); // second call should be a no-op
+        await using var client = new OsiLicensesClient(new HttpClient(handler));
+        await client.InitializeAsync(TestContext.Current.CancellationToken);
+        await client.InitializeAsync(TestContext.Current.CancellationToken); // second call should be a no-op
 
         // Only one base endpoint call should be necessary
-        Assert.Equal(1, calls);
+        calls.ShouldBe(1);
     }
 }

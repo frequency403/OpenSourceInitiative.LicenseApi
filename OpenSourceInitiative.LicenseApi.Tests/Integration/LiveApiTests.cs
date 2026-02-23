@@ -1,5 +1,4 @@
 using OpenSourceInitiative.LicenseApi.Clients;
-using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Tests.Infrastructure;
 
 namespace OpenSourceInitiative.LicenseApi.Tests.Integration;
@@ -9,31 +8,28 @@ public class LiveApiTests
     [OsiApiAvailableFact]
     public async Task GetAllLicenses_Matches_Expectations()
     {
-        await using var osiClient = new OsiClient();
-        await using var client = new OsiLicensesClient(osiClient);
+        await using var client = new OsiLicensesClient();
         var all = await client.GetAllLicensesAsync(CancellationToken.None);
-        Assert.NotNull(all);
-        Assert.NotEmpty(all);
+        all.ShouldNotBeNull();
+        all.ShouldNotBeEmpty();
 
         // Spot check known SPDX identifiers likely to exist
         var mit = await client.GetBySpdxAsync("MIT");
-        Assert.NotNull(mit);
-        Assert.False(string.IsNullOrWhiteSpace(mit.Name));
+        mit.ShouldNotBeNull();
+        string.IsNullOrWhiteSpace(mit.Name).ShouldBeFalse();
 
         // Search should return reasonable results
         var apache = await client.SearchAsync("Apache");
-        Assert.True(apache.Count > 0);
+        apache.Count.ShouldBeGreaterThan(0);
     }
 
     [OsiApiAvailableFact]
     public async Task HtmlExtraction_Returns_Text()
     {
-        using var http = new HttpClient();
-        await using var osiClient = new OsiClient(httpClient: http);
-        var mit = await osiClient.GetByOsiIdAsync("mit");
-        Assert.NotNull(mit);
-        var text = mit!.LicenseText;
-        Assert.NotNull(text);
-        Assert.True(text.Length > 0);
+        await using var client = new OsiLicensesClient();
+        var mit = await client.GetBySpdxAsync("MIT");
+        mit.ShouldNotBeNull();
+        mit.LicenseText.ShouldNotBeNull();
+        mit.LicenseText.Length.ShouldBeGreaterThan(0);
     }
 }

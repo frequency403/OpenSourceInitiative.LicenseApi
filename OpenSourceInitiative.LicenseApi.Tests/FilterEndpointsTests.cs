@@ -2,8 +2,6 @@ using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
-using OpenSourceInitiative.LicenseApi.Exceptions;
-using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
@@ -11,13 +9,6 @@ namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class FilterEndpointsTests
 {
-    private static (IOsiClient osiClient, StubHttpMessageHandler handler) CreateOsiClient(
-        Func<HttpRequestMessage, HttpResponseMessage> responder)
-    {
-        var handler = new StubHttpMessageHandler(responder);
-        var http = new HttpClient(handler);
-        return (new OsiClient(httpClient: http), handler);
-    }
     public static IEnumerable<object[]> SuccessCases()
     {
         // name=mit
@@ -27,7 +18,7 @@ public class FilterEndpointsTests
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesByNameAsync("mit")),
             // first request url
-            "https://opensource.org/api/license?name=mit",
+            "https://opensource.org/api/licenses?name=mit",
             // json
             "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]",
             // html map (substring -> inner text)
@@ -43,7 +34,7 @@ public class FilterEndpointsTests
         [
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesByKeywordAsync("popular-strong-community")),
-            "https://opensource.org/api/license?keyword=popular-strong-community",
+            "https://opensource.org/api/licenses?keyword=popular-strong-community",
             "[" + string.Join(',', new[]
             {
                 "{" + string.Join(',',
@@ -73,7 +64,7 @@ public class FilterEndpointsTests
         [
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity)),
-            "https://opensource.org/api/license?keyword=popular-strong-community",
+            "https://opensource.org/api/licenses?keyword=popular-strong-community",
             "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]",
             new Dictionary<string, string> { ["/license/mit/"] = "MIT" },
             new[] { "MIT" },
@@ -85,7 +76,7 @@ public class FilterEndpointsTests
         [
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesByStewardAsync("eclipse-foundation")),
-            "https://opensource.org/api/license?steward=eclipse-foundation",
+            "https://opensource.org/api/licenses?steward=eclipse-foundation",
             "[{\"id\":\"epl-2.0\",\"name\":\"Eclipse Public License 2.0\",\"spdx_id\":\"EPL-2.0\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/epl-2-0/\"},\"collection\":{\"href\":\"c\"}}}]",
             new Dictionary<string, string> { ["/license/epl-2-0/"] = "EPL" },
             new[] { "EPL-2.0" },
@@ -97,7 +88,7 @@ public class FilterEndpointsTests
         [
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesBySpdxPatternAsync("gpl*")),
-            "https://opensource.org/api/license?spdx=gpl*",
+            "https://opensource.org/api/licenses?spdx=gpl*",
             "[{\"id\":\"gpl-3.0\",\"name\":\"GNU GPL v3\",\"spdx_id\":\"GPL-3.0-only\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/gpl-3-0/\"},\"collection\":{\"href\":\"c\"}}}]",
             new Dictionary<string, string> { ["/license/gpl-3-0/"] = "GPL3" },
             new[] { "GPL-3.0-only" },
@@ -150,7 +141,7 @@ public class FilterEndpointsTests
         [
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesByNameAsync("mit")),
-            "https://opensource.org/api/license?name=mit",
+            "https://opensource.org/api/licenses?name=mit",
             "__HTTP_500__",
             new Dictionary<string, string>(),
             0
@@ -161,7 +152,7 @@ public class FilterEndpointsTests
         [
             (Func<OsiLicensesClient, Task<IReadOnlyList<OsiLicense>>>)(c =>
                 c.GetLicensesByKeywordAsync("popular-strong-community")),
-            "https://opensource.org/api/license?keyword=popular-strong-community",
+            "https://opensource.org/api/licenses?keyword=popular-strong-community",
             "[]",
             new Dictionary<string, string>(),
             0
@@ -179,7 +170,7 @@ public class FilterEndpointsTests
         Dictionary<string, string> expectedTexts)
     {
         // Arrange
-        var (osiClient, _) = CreateOsiClient(req =>
+        var http = new HttpClient(new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == requestUrl)
@@ -193,16 +184,16 @@ public class FilterEndpointsTests
                     return StubHttpMessageHandler.Html($"<div class='license-content'>{kv.Value}</div>");
 
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-        await using var client = new OsiLicensesClient(osiClient);
+        }));
+        await using var client = new OsiLicensesClient(http);
 
         // Act
         var list = await call(client);
 
         // Assert
-        list.Should().NotBeNull();
-        list.Select(l => l.SpdxId).Should().BeEquivalentTo(expectedSpdxIds, o => o.WithoutStrictOrdering());
-        //foreach (var kv in expectedTexts) list.First(l => l.SpdxId == kv.Key).LicenseText.Should().Be(kv.Value);
+        list.ShouldNotBeNull();
+        list.Select(l => l.SpdxId).OrderBy(x => x).ShouldBe(expectedSpdxIds.OrderBy(x => x));
+        foreach (var kv in expectedTexts) list.First(l => l.SpdxId == kv.Key).LicenseText.ShouldBe(kv.Value);
     }
 
     [Theory]
@@ -215,7 +206,7 @@ public class FilterEndpointsTests
         int expectedCount)
     {
         // Arrange
-        var (osiClient, _) = CreateOsiClient(req =>
+        var http = new HttpClient(new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
 
@@ -237,20 +228,14 @@ public class FilterEndpointsTests
                     return StubHttpMessageHandler.Html($"<div class='license-content'>{kv.Value}</div>");
 
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
-        await using var client = new OsiLicensesClient(osiClient);
+        }));
+        await using var client = new OsiLicensesClient(http);
 
-        // Act & Assert
-        if (json == "__HTTP_500__")
-        {
-            var act = () => call(client);
-            await act.Should().ThrowAsync<Exception>().Where(e => e is HttpRequestException || e is System.Text.Json.JsonException);
-        }
-        else
-        {
-            var list = await call(client);
-            list.Should().NotBeNull();
-            list.Should().HaveCount(expectedCount);
-        }
+        // Act
+        var list = await call(client);
+
+        // Assert
+        list.ShouldNotBeNull();
+        list.Count.ShouldBe(expectedCount);
     }
 }

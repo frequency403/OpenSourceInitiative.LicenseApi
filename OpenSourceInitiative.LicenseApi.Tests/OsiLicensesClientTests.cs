@@ -1,23 +1,20 @@
 using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
-using OpenSourceInitiative.LicenseApi.Interfaces;
-using OpenSourceInitiative.LicenseApi.Exceptions;
-using OpenSourceInitiative.LicenseApi.Options;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class OsiLicensesClientTests
 {
-    private const string ApiBase = "https://opensource.org/api/license";
+    private const string ApiBase = "https://opensource.org/api/licenses";
 
-    private static (IOsiClient osiClient, StubHttpMessageHandler handler) CreateOsiClient(
+    private static (HttpClient client, StubHttpMessageHandler handler) CreateClient(
         Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
         var handler = new StubHttpMessageHandler(responder);
         var http = new HttpClient(handler);
-        return (new OsiClient(httpClient: http), handler);
+        return (http, handler);
     }
 
     [Fact]
@@ -41,7 +38,7 @@ public class OsiLicensesClientTests
             ) + "}"
         }) + "]";
 
-        var (osiClient, _) = CreateOsiClient(req =>
+        var (httpClient, _) = CreateClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == ApiBase)
@@ -58,26 +55,40 @@ public class OsiLicensesClientTests
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
         });
 
-        await using var client = new OsiLicensesClient(osiClient);
+        await using var client = new OsiLicensesClient(httpClient);
 
         // Act
-        var result = await client.GetAllLicensesAsync();
+        var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.ShouldNotBeEmpty();
         var mit = result.FirstOrDefault(x => x.SpdxId == "MIT");
         var ap2 = result.FirstOrDefault(x => x.SpdxId == "Apache-2.0");
-        mit.Should().NotBeNull();
-        mit!.LicenseText.Should().Be("MIT Text");
-        ap2.Should().NotBeNull();
-        ap2!.LicenseText.Should().Be("Apache 2.0 Text");
+        mit.ShouldNotBeNull();
+        mit!.LicenseText.ShouldBe("MIT Text");
+        ap2.ShouldNotBeNull();
+        ap2!.LicenseText.ShouldBe("Apache 2.0 Text");
+    }
+
+    [Fact]
+    public async Task GetAllLicensesAsync_FailSafeOnServerError_ReturnsSnapshot()
+    {
+        // Arrange
+        var (httpClient, _) = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        await using var client = new OsiLicensesClient(httpClient);
+
+        // Act
+        var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        result.ShouldBeEmpty(); // initial snapshot is empty
     }
 
     [Fact]
     public async Task GetAllLicensesAsync_UsesCachedSnapshot_OnSubsequentCalls()
     {
         // Arrange
-        var (baseClient, handler) = CreateOsiClient(req =>
+        var (httpClient, handler) = CreateClient(req =>
         {
             if (req.RequestUri!.ToString() != ApiBase)
                 return req.RequestUri!.ToString().Contains("/license/mit/")
@@ -91,45 +102,14 @@ public class OsiLicensesClientTests
             };
         });
 
-        var cachingClient = new OsiCachingClient(baseClient);
-        await using var client = new OsiLicensesClient(cachingClient);
+        await using var client = new OsiLicensesClient(httpClient);
 
         // Act
-        var first = await client.GetAllLicensesAsync();
-        var second = await client.GetAllLicensesAsync();
+        var first = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
+        var second = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        handler.TotalCalls.Should().Be(2);
-        second.Should().BeEquivalentTo(first);
-    }
-
-    [Fact]
-    public async Task GetAllLicensesAsync_Refetches_WhenNoCaching()
-    {
-        // Arrange
-        var (baseClient, handler) = CreateOsiClient(req =>
-        {
-            if (req.RequestUri!.ToString() != ApiBase)
-                return req.RequestUri!.ToString().Contains("/license/mit/")
-                    ? StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>")
-                    : new HttpResponseMessage(HttpStatusCode.NotFound);
-            const string json =
-                "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
-        });
-
-        await using var client = new OsiLicensesClient(baseClient);
-
-        // Act
-        var first = await client.GetAllLicensesAsync();
-        var second = await client.GetAllLicensesAsync();
-
-        // Assert
-        handler.TotalCalls.Should().Be(4);
-        second.Should().BeEquivalentTo(first);
-        second.Should().NotBeSameAs(first);
+        handler.TotalCalls.ShouldBeGreaterThanOrEqualTo(1);
+        second.ShouldBeSameAs(first);
     }
 }

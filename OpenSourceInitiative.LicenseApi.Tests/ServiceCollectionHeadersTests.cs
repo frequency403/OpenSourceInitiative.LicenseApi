@@ -21,8 +21,8 @@ public class ServiceCollectionHeadersTests
         var handler = new StubHttpMessageHandler(req =>
         {
             var uri = req.RequestUri!.ToString();
-            // Capture headers and the first API call to the license endpoint
-            if (firstApiUri is null && uri == "https://opensource.org/api/license")
+            // Capture headers and the first API call to the licenses endpoint
+            if (firstApiUri is null && uri == "https://opensource.org/api/licenses")
             {
                 firstApiUri = uri;
                 capturedAccept = req.Headers.Accept.ToArray();
@@ -50,15 +50,14 @@ public class ServiceCollectionHeadersTests
         var client = sp.GetRequiredService<IOsiLicensesClient>();
 
         // Act
-        var licenses = await client.GetAllLicensesAsync();
+        var licenses = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
 
         // Assert
-        licenses.Should().ContainSingle();
-        firstApiUri.Should().Be("https://opensource.org/api/license");
-        capturedAccept.Should().NotBeNull();
-        capturedAccept!.Should().Contain(x => x.MediaType == "application/json");
-        capturedUa.Should().NotBeNull();
-        capturedUa!.Should()
-            .Contain(x => x.Product != null && x.Product.Name == "OpenSourceInitiative-LicenseApi-Client");
+        licenses.ShouldHaveSingleItem();
+        firstApiUri.ShouldBe("https://opensource.org/api/licenses");
+        capturedAccept.ShouldNotBeNull();
+        capturedAccept.ShouldContain(x => x.MediaType == "application/json");
+        capturedUa.ShouldNotBeNull();
+        capturedUa.ShouldContain(x => x.Product != null && x.Product.Name == "OpenSourceInitiative-LicenseApi-Client");
     }
 }
