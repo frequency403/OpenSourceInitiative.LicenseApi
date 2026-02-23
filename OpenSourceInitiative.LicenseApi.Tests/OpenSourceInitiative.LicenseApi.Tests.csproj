@@ -24,8 +24,4 @@
     <ItemGroup>
         <ProjectReference Include="..\OpenSourceInitiative.LicenseApi\OpenSourceInitiative.LicenseApi.csproj"/>
     </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="TestResults\5eab5400-ba8a-4f32-88a3-79d060121001\coverage.cobertura.xml" />
-    </ItemGroup>
 </Project>
