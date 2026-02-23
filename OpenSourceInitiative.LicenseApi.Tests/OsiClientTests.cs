@@ -2,10 +2,7 @@ using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
-using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
-using FluentAssertions;
-using Xunit;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
@@ -39,7 +36,7 @@ public class OsiClientTests
         await client.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
 
         // Assert
-        handler.TotalCalls.Should().Be(1);
+        handler.TotalCalls.ShouldBe(1);
     }
 
     [Fact]
@@ -62,6 +59,6 @@ public class OsiClientTests
         await client.GetByStewardAsync("eclipse");
 
         // Assert
-        handler.TotalCalls.Should().Be(1);
+        handler.TotalCalls.ShouldBe(1);
     }
 }

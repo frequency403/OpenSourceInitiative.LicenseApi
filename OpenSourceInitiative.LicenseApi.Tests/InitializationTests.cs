@@ -31,7 +31,7 @@ public class InitializationTests
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
         });
 
-        await using var client = new OsiLicensesClient(new HttpClient(handler));
+        await using var client = new OsiLicensesClient(new OsiClient(httpClient: new HttpClient(handler)));
         await client.InitializeAsync(TestContext.Current.CancellationToken);
         await client.InitializeAsync(TestContext.Current.CancellationToken); // second call should be a no-op
 

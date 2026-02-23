@@ -8,7 +8,7 @@ public class LiveApiTests
     [OsiApiAvailableFact]
     public async Task GetAllLicenses_Matches_Expectations()
     {
-        await using var client = new OsiLicensesClient();
+        await using var client = new OsiLicensesClient(new OsiClient());
         var all = await client.GetAllLicensesAsync(CancellationToken.None);
         all.ShouldNotBeNull();
         all.ShouldNotBeEmpty();
@@ -26,7 +26,7 @@ public class LiveApiTests
     [OsiApiAvailableFact]
     public async Task HtmlExtraction_Returns_Text()
     {
-        await using var client = new OsiLicensesClient();
+        await using var client = new OsiLicensesClient(new OsiClient());
         var mit = await client.GetBySpdxAsync("MIT");
         mit.ShouldNotBeNull();
         mit.LicenseText.ShouldNotBeNull();

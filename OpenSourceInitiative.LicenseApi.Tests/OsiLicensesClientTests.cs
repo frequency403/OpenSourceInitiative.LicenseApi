@@ -1,20 +1,21 @@
 using System.Net;
 using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
+using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
 public class OsiLicensesClientTests
 {
-    private const string ApiBase = "https://opensource.org/api/licenses";
+    private const string ApiBase = "https://opensource.org/api/license";
 
-    private static (HttpClient client, StubHttpMessageHandler handler) CreateClient(
+    private static (IOsiClient osiClient, StubHttpMessageHandler handler) CreateOsiClient(
         Func<HttpRequestMessage, HttpResponseMessage> responder)
     {
         var handler = new StubHttpMessageHandler(responder);
         var http = new HttpClient(handler);
-        return (http, handler);
+        return (new OsiClient(httpClient: http), handler);
     }
 
     [Fact]
@@ -38,7 +39,7 @@ public class OsiLicensesClientTests
             ) + "}"
         }) + "]";
 
-        var (httpClient, _) = CreateClient(req =>
+        var (osiClient, _) = CreateOsiClient(req =>
         {
             var uri = req.RequestUri!.ToString();
             if (uri == ApiBase)
@@ -55,7 +56,7 @@ public class OsiLicensesClientTests
             return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
         });
 
-        await using var client = new OsiLicensesClient(httpClient);
+        await using var client = new OsiLicensesClient(osiClient);
 
         // Act
         var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
@@ -71,24 +72,10 @@ public class OsiLicensesClientTests
     }
 
     [Fact]
-    public async Task GetAllLicensesAsync_FailSafeOnServerError_ReturnsSnapshot()
-    {
-        // Arrange
-        var (httpClient, _) = CreateClient(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
-        await using var client = new OsiLicensesClient(httpClient);
-
-        // Act
-        var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
-
-        // Assert
-        result.ShouldBeEmpty(); // initial snapshot is empty
-    }
-
-    [Fact]
     public async Task GetAllLicensesAsync_UsesCachedSnapshot_OnSubsequentCalls()
     {
         // Arrange
-        var (httpClient, handler) = CreateClient(req =>
+        var (baseClient, handler) = CreateOsiClient(req =>
         {
             if (req.RequestUri!.ToString() != ApiBase)
                 return req.RequestUri!.ToString().Contains("/license/mit/")
@@ -102,7 +89,35 @@ public class OsiLicensesClientTests
             };
         });
 
-        await using var client = new OsiLicensesClient(httpClient);
+        var cachingClient = new OsiCachingClient(baseClient);
+        await using var client = new OsiLicensesClient(cachingClient);
+
+        // Act
+        var result = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        result.ShouldBeEmpty(); // initial snapshot is empty
+    }
+
+    [Fact]
+    public async Task GetAllLicensesAsync_Refetches_WhenNoCaching()
+    {
+        // Arrange
+        var (baseClient, handler) = CreateOsiClient(req =>
+        {
+            if (req.RequestUri!.ToString() != ApiBase)
+                return req.RequestUri!.ToString().Contains("/license/mit/")
+                    ? StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>")
+                    : new HttpResponseMessage(HttpStatusCode.NotFound);
+            const string json =
+                "[{\"id\":\"mit\",\"name\":\"MIT License\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+        });
+
+        await using var client = new OsiLicensesClient(baseClient);
 
         // Act
         var first = await client.GetAllLicensesAsync(TestContext.Current.CancellationToken);

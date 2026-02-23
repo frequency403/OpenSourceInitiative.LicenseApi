@@ -10,7 +10,7 @@ public class DisposeBehaviorTests
     public void Disposing_DefaultConstructed_Client_Disposes_Internal_HttpClient()
     {
         // Arrange
-        var client = new OsiLicensesClient();
+        var client = new OsiLicensesClient(new OsiClient());
 
         // Act
         client.Dispose();
@@ -26,7 +26,7 @@ public class DisposeBehaviorTests
         // Arrange
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
         var externalHttp = new HttpClient(handler);
-        var client = new OsiLicensesClient(externalHttp);
+        var client = new OsiLicensesClient(new OsiClient(httpClient: externalHttp));
 
         // Act
         await client.DisposeAsync();

@@ -3,10 +3,7 @@ using System.Text;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Interfaces;
-using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
-using FluentAssertions;
-using Xunit;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
@@ -47,10 +44,10 @@ public class OsiCachingClientTests
         var second = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable());
 
         // Assert
-        handler.TotalCalls.Should().Be(2);
-        first.Should().HaveCount(1);
-        second.Should().HaveCount(1);
-        second[0].Should().BeSameAs(first[0]);
+        handler.TotalCalls.ShouldBe(2);
+        first.Count.ShouldBe(1);
+        second.Count.ShouldBe(1);
+        second[0].ShouldBeSameAs(first[0]);
     }
 
     [Fact]
@@ -73,9 +70,9 @@ public class OsiCachingClientTests
         var second = await cachingClient.GetByOsiIdAsync("mit");
 
         // Assert
-        handler.TotalCalls.Should().Be(2);
-        first.Should().NotBeNull();
-        second.Should().BeSameAs(first);
+        handler.TotalCalls.ShouldBe(2);
+        first.ShouldNotBeNull();
+        second.ShouldBeSameAs(first);
     }
 
     [Fact]
@@ -104,6 +101,6 @@ public class OsiCachingClientTests
         await cachingClient.GetByStewardAsync("Eclipse");
 
         // Assert
-        handler.TotalCalls.Should().Be(4);
+        handler.TotalCalls.ShouldBe(4);
     }
 }
