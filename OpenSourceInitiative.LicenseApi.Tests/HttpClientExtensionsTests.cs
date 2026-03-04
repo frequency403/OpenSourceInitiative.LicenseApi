@@ -21,9 +21,11 @@ public class HttpClientExtensionsTests
         };
 
         // Act
-        var text = await http.GetLicenseTextAsync(lic);
+        var method = typeof(HttpClientExtensions).GetMethod("GetLicenseTextAsync", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var textTask = (Task<string>)method!.Invoke(null, [http, lic, CancellationToken.None])!;
+        var text = await textTask;
 
         // Assert
-        text.Should().Be(expected);
+        text.ShouldBe(expected);
     }
 }

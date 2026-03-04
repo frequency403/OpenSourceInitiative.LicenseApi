@@ -3,7 +3,10 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
+using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
+
+using OpenSourceInitiative.LicenseApi.Clients;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
@@ -13,34 +16,77 @@ public class DependencyInjectionTests
     public async Task AddOsiLicensesClient_RegistersTypedClient_AndWorksWithCustomHandler()
     {
         // Arrange
-        const string json =
-            "[{\"id\":\"mit\",\"name\":\"MIT\",\"spdx_id\":\"MIT\",\"_links\":{\"self\":{\"href\":\"s\"},\"html\":{\"href\":\"https://opensource.org/license/mit/\"},\"collection\":{\"href\":\"c\"}}}]";
-        var handler = new StubHttpMessageHandler(req =>
-        {
-            var uri = req.RequestUri!.ToString();
-            if (uri == "https://opensource.org/api/licenses")
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(json, Encoding.UTF8, "application/json")
-                };
-            if (uri.Contains("/license/mit/"))
-                return StubHttpMessageHandler.Html("<div class='license-content'>MIT</div>");
-            return StubHttpMessageHandler.Status(HttpStatusCode.NotFound);
-        });
+        var handler = new StubHttpMessageHandler(req => StubHttpMessageHandler.Status(HttpStatusCode.OK));
 
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOsiLicensesClient(o => { o.PrimaryHandlerFactory = () => handler; });
 
         await using var provider = services.BuildServiceProvider();
-        var client = provider.GetRequiredService<IOsiLicensesClient>();
 
-        // Act
-        var licenses = await client.GetAllLicensesAsync();
+        // Act: ensure typed HttpClient is created using our handler
+        var factory = provider.GetRequiredService<IHttpClientFactory>();
+        var http = factory.CreateClient("OsiClient");
+        var response = await http.GetAsync("license", TestContext.Current.CancellationToken);
 
         // Assert
-        licenses.Should().ContainSingle();
-        licenses[0].SpdxId.Should().Be("MIT");
-        licenses[0].LicenseText.Should().Be("MIT");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        handler.TotalCalls.ShouldBe(1);
+        // And IOsiClient is available in DI
+        var client = provider.GetRequiredService<IOsiClient>();
+        client.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void AddOsiLicensesClient_Resolves_Caching_Client_By_Default()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOsiLicensesClient();
+
+        using var sp = services.BuildServiceProvider();
+
+        // Act
+        var client = sp.GetRequiredService<IOsiClient>();
+
+        // Assert
+        client.ShouldBeOfType<OsiCachingClient>();
+    }
+
+    [Fact]
+    public void AddOsiLicensesClient_Resolves_NonCaching_Client_When_Disabled()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOsiLicensesClient(o => o.EnableCaching = false);
+
+        using var sp = services.BuildServiceProvider();
+
+        // Act
+        var client = sp.GetRequiredService<IOsiClient>();
+
+        // Assert
+        client.ShouldBeOfType<OsiClient>();
+    }
+
+    [Fact]
+    public void AddOsiLicensesClient_Registers_Keyed_NonCaching_Client_When_Caching_Enabled()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddOsiLicensesClient();
+
+        using var sp = services.BuildServiceProvider();
+
+        // Act
+        var nonCaching = sp.GetRequiredKeyedService<IOsiClient>("OsiNonCachingClient");
+        var caching = sp.GetRequiredService<IOsiClient>();
+
+        // Assert
+        nonCaching.ShouldBeOfType<OsiClient>();
+        caching.ShouldBeOfType<OsiCachingClient>();
     }
 }

@@ -1,4 +1,7 @@
+using System.Globalization;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+// ReSharper disable ExplicitCallerInfoArgument
 
 namespace OpenSourceInitiative.LicenseApi.Tests.Infrastructure;
 
@@ -13,12 +16,12 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
 {
     private const string DefaultBaseUrl = "https://opensource.org/api/license";
 
-    public OsiApiAvailableFactAttribute()
+    public OsiApiAvailableFactAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = 0) : base(sourceFilePath, sourceLineNumber)
     {
         try
         {
-            var force = Environment.GetEnvironmentVariable("OSI_API_TESTS");
-            if (string.Equals(force, "1", StringComparison.Ordinal)) return; // do not skip; user opted in explicitly
+            if (int.TryParse(Environment.GetEnvironmentVariable("OSI_API_TESTS"), out var parsedInt) && parsedInt is 1) 
+                return;
 
             // Quick TCP reachability check on port 443 to avoid HTTP stack overhead
             var host = new Uri(DefaultBaseUrl).Host;

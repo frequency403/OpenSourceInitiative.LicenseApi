@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Create tag if missing
         id: tag
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner;
@@ -46,7 +46,6 @@ jobs:
             try {
               await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
               core.info(`Tag '${tag}' already exists. Skipping.`);
-              core.setOutput("tag", tag);
               return;
             } catch (e) {
               // expected if it doesn't exist
@@ -63,7 +62,7 @@ jobs:
             core.setOutput("tag", tag);
 
       - name: Dispatch publish workflow for the created tag
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner;

@@ -1,0 +1,251 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "OpenSource Licenses API",
+    "version": "1.1.1",
+    "description": "Public API providing access to Open Source Initiative (OSI) license information."
+  },
+  "servers": [
+    {
+      "url": "https://opensource.org/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "License",
+      "description": "Operations for querying OSI licenses"
+    }
+  ],
+  "paths": {
+    "/license": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Get all licenses",
+        "description": "Returns all public/published licenses.",
+        "operationId": "GetAllLicenses",
+        "responses": {
+          "200": {
+            "description": "List of licenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/License" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/license?name={name}": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Filter licenses by name",
+        "description": "Returns licenses whose name contains the specified text.",
+        "operationId": "GetLicensesByName",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered licenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/License" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/license?keyword={keyword}": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Filter licenses by keyword",
+        "operationId": "GetLicensesByKeyword",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "popular-strong-community",
+                "international",
+                "special-purpose",
+                "non-reusable",
+                "superseded",
+                "voluntarily-retired",
+                "redundant-with-more-popular",
+                "other-miscellaneous",
+                "uncategorized"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered licenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/License" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/license?steward={steward}": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Filter licenses by steward",
+        "operationId": "GetLicensesBySteward",
+        "parameters": [
+          {
+            "name": "steward",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered licenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/License" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/license?spdx={spdx}": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Filter licenses by SPDX identifier",
+        "description": "Supports wildcard matching using '*'",
+        "operationId": "GetLicensesBySpdx",
+        "parameters": [
+          {
+            "name": "spdx",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Filtered licenses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/License" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/license/{id}": {
+      "get": {
+        "tags": ["License"],
+        "summary": "Get license by OSI license ID",
+        "description": "Returns a single license by its Open Source Initiative license identifier.",
+        "operationId": "GetLicenseById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "License details",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/License" }
+              }
+            }
+          },
+          "404": {
+            "description": "License not found"
+          }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "schemas": {
+      "License": {
+        "type": "object",
+        "required": ["id", "name", "spdx_id", "approved", "keywords", "_links"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "spdx_id": { "type": "string" },
+          "version": { "type": "string", "nullable": true },
+          "submission_date": { "type": "string", "nullable": true },
+          "submission_url": { "type": "string", "nullable": true },
+          "submitter_name": { "type": "string", "nullable": true },
+          "approved": { "type": "boolean" },
+          "approval_date": { "type": "string", "nullable": true },
+          "license_steward_version": { "type": "string", "nullable": true },
+          "license_steward_url": { "type": "string", "nullable": true },
+          "board_minutes": { "type": "string", "nullable": true },
+          "stewards": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "keywords": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "_links": { "$ref": "#/components/schemas/Links" }
+        }
+      },
+      "Links": {
+        "type": "object",
+        "required": ["self", "html", "collection"],
+        "properties": {
+          "self": { "$ref": "#/components/schemas/Link" },
+          "html": { "$ref": "#/components/schemas/Link" },
+          "collection": { "$ref": "#/components/schemas/Link" }
+        }
+      },
+      "Link": {
+        "type": "object",
+        "required": ["href"],
+        "properties": {
+          "href": { "type": "string", "format": "uri" }
+        }
+      }
+    }
+  }
+}

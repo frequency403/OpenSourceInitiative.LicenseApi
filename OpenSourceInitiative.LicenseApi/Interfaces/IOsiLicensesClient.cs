@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Models;
 // ReSharper disable UnusedMemberInSuper.Global
@@ -5,15 +6,9 @@ using OpenSourceInitiative.LicenseApi.Models;
 namespace OpenSourceInitiative.LicenseApi.Interfaces;
 
 /// <summary>
-///     Contract for a lightweight client that interacts with the Open Source Initiative (OSI) License API.
+///     <b>----DEPRECATED----</b> Use <see cref="IOsiClient" /> instead.
 /// </summary>
-/// <remarks>
-///     The client is designed to be resilient:
-///     - Fetches the catalog of OSI licenses and extracts human‑readable license text from the HTML pages.
-///     - Maintains an in‑memory, thread‑safe cache of licenses once loaded; subsequent queries operate on this snapshot.
-///     - All network calls are fail‑safe. On errors, the client returns the last available snapshot (which may be empty).
-///     - Provides both asynchronous methods and synchronous counterparts for convenience.
-/// </remarks>
+[Obsolete("Use IOsiClient instead.")]
 public interface IOsiLicensesClient : IDisposable, IAsyncDisposable
 {
     /// <summary>
