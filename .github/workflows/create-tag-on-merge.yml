@@ -46,7 +46,6 @@ jobs:
             try {
               await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
               core.info(`Tag '${tag}' already exists. Skipping.`);
-              core.setOutput("tag", tag);
               return;
             } catch (e) {
               // expected if it doesn't exist
