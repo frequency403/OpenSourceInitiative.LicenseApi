@@ -7,54 +7,46 @@ using OpenSourceInitiative.LicenseApi.Interfaces;
 
 Console.WriteLine("--- OpenSourceInitiative.LicenseApi Example ---\n");
 
-// 1) Direct usage (no DI)
-Console.WriteLine("1) Direct usage (no DI)\n");
-using (var http = new HttpClient())
-{
-    // Base address is optional; client defaults to https://opensource.org/api/
-    http.BaseAddress = new Uri("https://opensource.org/api/");
-    await using (var direct = new OsiLicensesClient(http))
-    {
-        var all = await direct.GetAllLicensesAsync();
-        Console.WriteLine($"Loaded {all.Count} licenses (direct).\n");
-
-        var mit = await direct.GetBySpdxAsync("MIT");
-        Console.WriteLine($"Lookup SPDX 'MIT': {(mit is null ? "not found" : mit.Name)}\n");
-
-        var search = await direct.SearchAsync("Apache");
-        Console.WriteLine($"Search 'Apache' returned {search.Count} result(s).\n");
-
-        // New: server-side keyword filter using strongly-typed enum
-        var popular = await direct.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
-        Console.WriteLine(
-            $"Popular/strong-community licenses: {popular.Count} (first: {popular.FirstOrDefault()?.Name ?? "n/a"})\n");
-    }
-}
-
-// 2) Using DI extensions to register typed client
-Console.WriteLine("2) Dependency Injection usage\n");
+// 1) Dependency Injection usage
+Console.WriteLine("1) Dependency Injection usage\n");
 var services = new ServiceCollection();
 services.AddLogging(b => b.AddConsole());
-services.AddOsiLicensesClient(
-//     o =>
-// {
-//     // Optional configuration
-//     //o.BaseAddress = new Uri("https://opensource.org/api/");
-//     //o.PrimaryHandlerFactory = () => new HttpClientHandler { AllowAutoRedirect = false };
-// }
-);
+
+// Register with caching enabled by default
+services.AddOsiLicensesClient(options =>
+{
+    options.EnableCaching = true;
+});
 
 await using var provider = services.BuildServiceProvider();
-var client = provider.GetRequiredService<IOsiLicensesClient>();
+var client = provider.GetRequiredService<IOsiClient>();
 
-var allViaDi = await client.GetAllLicensesAsync();
-Console.WriteLine($"Loaded {allViaDi.Count} licenses (DI).\n");
+var allViaDi = await client.GetAllLicensesAsyncEnumerable().ToListAsync();
+Console.WriteLine($"Loaded {allViaDi.Count} licenses (DI with caching).\n");
 
-var mitViaDi = client.GetBySpdx("MIT"); // sync variant
-Console.WriteLine($"Sync lookup SPDX 'MIT': {(mitViaDi is null ? "not found" : mitViaDi.Name)}\n");
+var mitViaDi = (await client.GetBySpdxIdAsync("MIT")).FirstOrDefault();
+Console.WriteLine($"Lookup SPDX 'MIT': {(mitViaDi is null ? "not found" : mitViaDi.Name)}\n");
 
 // Enum-based keyword filter via DI client
-var eclipsePopular = await client.GetLicensesByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
-Console.WriteLine($"Popular licenses via DI: {eclipsePopular.Count}\n");
+var popular = (await client.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity)).ToList();
+Console.WriteLine($"Popular licenses via DI: {popular.Count}\n");
+
+// 2) Demonstrate different caching methods
+Console.WriteLine("2) Demonstrate different caching methods\n");
+
+// Example of registering without caching
+var servicesNoCache = new ServiceCollection();
+servicesNoCache.AddOsiLicensesClient(options => options.EnableCaching = false);
+await using var providerNoCache = servicesNoCache.BuildServiceProvider();
+var clientNoCache = providerNoCache.GetRequiredService<IOsiClient>();
+Console.WriteLine($"Client without caching: {clientNoCache.GetType().Name}\n");
+
+// Example of registering with memory cache
+var servicesMemoryCache = new ServiceCollection();
+servicesMemoryCache.AddMemoryCache(); // Required for MemoryCacheAdapter
+servicesMemoryCache.AddOsiLicensesClient(options => options.EnableCaching = true);
+await using var providerMemoryCache = servicesMemoryCache.BuildServiceProvider();
+var clientMemoryCache = providerMemoryCache.GetRequiredService<IOsiClient>();
+Console.WriteLine($"Client with memory caching: {clientMemoryCache.GetType().Name}\n");
 
 Console.WriteLine("Example completed.\n");
