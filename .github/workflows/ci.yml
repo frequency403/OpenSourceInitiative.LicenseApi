@@ -106,7 +106,7 @@ jobs:
 
       - name: Upload coverage (cobertura)
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.dotnet }}
           path: |
