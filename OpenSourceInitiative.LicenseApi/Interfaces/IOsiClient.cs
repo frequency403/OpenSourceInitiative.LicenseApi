@@ -12,18 +12,20 @@ public interface IOsiClient : IDisposable, IAsyncDisposable
     /// <summary>
     ///     Retrieves all available licenses from the OSI API as an asynchronous stream.
     /// </summary>
+    /// <param name="token">The cancellation token.</param>
     /// <returns>An <see cref="IAsyncEnumerable{OsiLicense}"/> of all registered licenses.</returns>
-    IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable();
+    IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable(CancellationToken token = default);
 
     /// <summary>
     ///     Retrieves a single license by its unique OSI identifier.
     /// </summary>
     /// <param name="id">The unique OSI ID (e.g., "mit", "apache2").</param>
+    /// <param name="token">The cancellation token.</param>
     /// <returns>
     ///     A task that represents the asynchronous operation. The task result contains the 
     ///     <see cref="OsiLicense"/> if found; otherwise, <c>null</c>.
     /// </returns>
-    Task<OsiLicense?> GetByOsiIdAsync(string id);
+    Task<OsiLicense?> GetByOsiIdAsync(string id, CancellationToken token = default);
 
     /// <summary>
     ///     Filters licenses by their SPDX identifier. <br />
@@ -51,27 +53,31 @@ public interface IOsiClient : IDisposable, IAsyncDisposable
     ///     </list>
     /// </summary>
     /// <param name="id">The SPDX identifier or pattern to search for.</param>
+    /// <param name="token">The cancellation token.</param>
     /// <returns>A collection of matching <see cref="OsiLicense"/> objects.</returns>
-    Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id);
+    Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id, CancellationToken token = default);
 
     /// <summary>
     ///     Filters licenses by their human-readable name.
     /// </summary>
     /// <param name="name">The name or partial name to search for.</param>
+    /// <param name="token">The cancellation token.</param>
     /// <returns>A collection of matching <see cref="OsiLicense"/> objects.</returns>
-    Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name);
+    Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name, CancellationToken token = default);
 
     /// <summary>
     ///     Filters licenses based on specific classification keywords assigned by the OSI.
     /// </summary>
     /// <param name="keyword">The keyword token (<see cref="OsiLicenseKeyword"/>).</param>
+    /// <param name="token">The cancellation token.</param>
     /// <returns>A collection of matching <see cref="OsiLicense"/> objects.</returns>
-    Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword);
+    Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword, CancellationToken token = default);
 
     /// <summary>
     ///     Filters licenses based on the steward (organization or entity) responsible for the license.
     /// </summary>
     /// <param name="steward">The name of the steward to search for.</param>
+    /// <param name="token">The cancellation token.</param>
     /// <returns>A collection of matching <see cref="OsiLicense"/> objects.</returns>
-    Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward);
+    Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward, CancellationToken token = default);
 }

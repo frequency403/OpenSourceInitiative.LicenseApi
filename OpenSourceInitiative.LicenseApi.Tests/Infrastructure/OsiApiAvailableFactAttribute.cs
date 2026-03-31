@@ -27,7 +27,7 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
             var host = new Uri(DefaultBaseUrl).Host;
             using var tcp = new TcpClient();
             var result = tcp.BeginConnect(host, 443, null, null);
-            if (!result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(1200)))
+            if (!result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(20)))
             {
                 Skip = "Skipping: OSI API not reachable (timeout). Set OSI_API_TESTS=1 to force run.";
                 return;

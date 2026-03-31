@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using OpenSourceInitiative.LicenseApi.Caches;
 using OpenSourceInitiative.LicenseApi.Converter;
@@ -18,10 +19,9 @@ internal sealed class OsiCachingClient([FromKeyedServices(ServiceCollectionExten
     private const string StewardCacheKeyPrefix = "steward_";
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()
+    public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable([EnumeratorCancellation] CancellationToken token = default)
     {
-        var cached = await cache.GetAsync<List<OsiLicense?>>(AllLicensesCacheKey).ConfigureAwait(false);
-        if (cached != null)
+        if (await GetLicenseFromCacheByKeyAsync(AllLicensesCacheKey, token) is {  } cached)
         {
             foreach (var license in cached)
             {
@@ -31,80 +31,88 @@ internal sealed class OsiCachingClient([FromKeyedServices(ServiceCollectionExten
         }
 
         var list = new List<OsiLicense?>();
-        await foreach (var license in client.GetAllLicensesAsyncEnumerable().ConfigureAwait(false))
+        await foreach (var license in client.GetAllLicensesAsyncEnumerable(token).ConfigureAwait(false))
         {
             list.Add(license);
             yield return license;
         }
-        await cache.SetAsync(AllLicensesCacheKey, list).ConfigureAwait(false);
+        await cache.SetAsync(AllLicensesCacheKey, list, ct: token);
     }
 
     /// <inheritdoc />
-    public async Task<OsiLicense?> GetByOsiIdAsync(string id)
+    public async Task<OsiLicense?> GetByOsiIdAsync(string id, CancellationToken token = default)
     {
         var key = OsiIdCacheKeyPrefix + id;
-        var cached = await cache.GetAsync<OsiLicense?>(key).ConfigureAwait(false);
+        var cached = await cache.GetAsync<OsiLicense?>(key, token);
         if (cached != null) return cached;
 
-        var license = await client.GetByOsiIdAsync(id).ConfigureAwait(false);
+        var license = await client.GetByOsiIdAsync(id, token);
         if (license != null)
         {
-            await cache.SetAsync(key, license).ConfigureAwait(false);
+            await cache.SetAsync(key, license, ct: token);
         }
         return license;
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id)
+    public async Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id, CancellationToken token = default)
     {
         var key = SpdxIdCacheKeyPrefix + id;
-        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
-        if (cached != null) return cached;
+        if (await GetLicenseFromCacheByKeyAsync(key, token) is {  } cached)
+            return cached;
 
-        var licenses = await client.GetBySpdxIdAsync(id).ConfigureAwait(false);
+        if (await client.GetBySpdxIdAsync(id, token) is not { } licenses) 
+            return [];
         var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
-        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        await cache.SetAsync(key, licenseList, ct: token);
         return licenseList;
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name)
+    public async Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name, CancellationToken token = default)
     {
         var key = NameCacheKeyPrefix + name;
-        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
-        if (cached != null) return cached;
+        if (await GetLicenseFromCacheByKeyAsync(key, token) is {  } cached)
+            return cached;
 
-        var licenses = await client.GetByNameAsync(name).ConfigureAwait(false);
+        if (await client.GetByNameAsync(name, token) is not { } licenses) 
+            return [];
+        
         var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
-        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        await cache.SetAsync(key, licenseList, ct: token);
         return licenseList;
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword)
+    public async Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword, CancellationToken token = default)
     {
         var key = KeywordCacheKeyPrefix + OsiLicenseKeywordMapping.ToApiValue(keyword);
-        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
-        if (cached != null) return cached;
-
-        var licenses = await client.GetByKeywordAsync(keyword).ConfigureAwait(false);
+        if (await GetLicenseFromCacheByKeyAsync(key, token) is {  } cached)
+            return cached;
+        
+        if(await client.GetByKeywordAsync(keyword, token) is not { } licenses) 
+            return [];
+        
         var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
-        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        await cache.SetAsync(key, licenseList, ct: token);
         return licenseList;
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward)
+    public async Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward, CancellationToken token = default)
     {
         var key = StewardCacheKeyPrefix + steward;
-        var cached = await cache.GetAsync<List<OsiLicense?>>(key).ConfigureAwait(false);
-        if (cached != null) return cached;
-
-        var licenses = await client.GetByStewardAsync(steward).ConfigureAwait(false);
+        if (await GetLicenseFromCacheByKeyAsync(key, token) is {  } cached)
+            return cached;
+        if (await client.GetByStewardAsync(steward, token) is not { } licenses) return [];
+        
         var licenseList = licenses as List<OsiLicense?> ?? licenses.ToList();
-        await cache.SetAsync(key, licenseList).ConfigureAwait(false);
+        await cache.SetAsync(key, licenseList, ct: token);
         return licenseList;
     }
+    
+    private ValueTask<List<OsiLicense?>?> GetLicenseFromCacheByKeyAsync(string key, CancellationToken token)
+        => cache.GetAsync<List<OsiLicense?>>(key, token);
     
     private void Dispose(bool disposing)
     {
@@ -122,7 +130,7 @@ internal sealed class OsiCachingClient([FromKeyedServices(ServiceCollectionExten
 
     private async ValueTask DisposeAsyncCore()
     {
-        await client.DisposeAsync().ConfigureAwait(false);
+        await client.DisposeAsync();
     }
 
     public async ValueTask DisposeAsync()

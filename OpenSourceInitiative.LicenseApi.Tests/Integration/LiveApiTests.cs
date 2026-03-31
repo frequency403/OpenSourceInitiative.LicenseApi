@@ -11,15 +11,20 @@ public class LiveApiTests
     {
         await using var client = new OsiClient();
         var all = new List<OsiLicense?>();
-        await foreach (var license in client.GetAllLicensesAsyncEnumerable())
+        using var linkedToken = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+#if !DEBUG
+        linkedToken.CancelAfter(TimeSpan.FromSeconds(30));
+#endif
+        await foreach (var license in client.GetAllLicensesAsyncEnumerable(linkedToken.Token))
         {
             all.Add(license);
         }
+
         all.ShouldNotBeNull();
         all.ShouldNotBeEmpty();
 
         // Spot check known SPDX identifiers likely to exist
-        var mitResults = await client.GetBySpdxIdAsync("MIT");
+        var mitResults = await client.GetBySpdxIdAsync("MIT", linkedToken.Token);
         var mit = mitResults.FirstOrDefault(x => x?.SpdxId == "MIT");
         mit.ShouldNotBeNull();
         string.IsNullOrWhiteSpace(mit.Name).ShouldBeFalse();
@@ -29,7 +34,8 @@ public class LiveApiTests
     public async Task HtmlExtraction_Returns_Text()
     {
         await using var client = new OsiClient();
-        var mitResults = await client.GetBySpdxIdAsync("MIT");
+        using var linkedToken = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var mitResults = await client.GetBySpdxIdAsync("MIT", linkedToken.Token);
         var mit = mitResults.FirstOrDefault(x => x?.SpdxId == "MIT");
         mit.ShouldNotBeNull();
         mit.LicenseText.ShouldNotBeNull();

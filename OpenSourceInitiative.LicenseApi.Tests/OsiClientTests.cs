@@ -30,7 +30,7 @@ public class OsiClientTests
 
         // Act
         client.Dispose();
-        var act = async () => await client.GetByOsiIdAsync("mit");
+        var act = async () => await client.GetByOsiIdAsync("mit", TestContext.Current.CancellationToken);
 
         // Assert
         act.ShouldThrow<ObjectDisposedException>();

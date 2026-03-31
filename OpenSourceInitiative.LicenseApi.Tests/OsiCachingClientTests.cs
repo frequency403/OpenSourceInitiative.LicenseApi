@@ -41,8 +41,8 @@ public class OsiCachingClientTests
         var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
 
         // Act
-        var first = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable());
-        var second = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable());
+        var first = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable(TestContext.Current.CancellationToken));
+        var second = await ToListAsync(cachingClient.GetAllLicensesAsyncEnumerable(TestContext.Current.CancellationToken));
 
         // Assert
         handler.TotalCalls.ShouldBe(2);
@@ -67,8 +67,8 @@ public class OsiCachingClientTests
         var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
 
         // Act
-        var first = await cachingClient.GetByOsiIdAsync("mit");
-        var second = await cachingClient.GetByOsiIdAsync("mit");
+        var first = await cachingClient.GetByOsiIdAsync("mit", TestContext.Current.CancellationToken);
+        var second = await cachingClient.GetByOsiIdAsync("mit", TestContext.Current.CancellationToken);
 
         // Assert
         handler.TotalCalls.ShouldBe(2);
@@ -92,14 +92,14 @@ public class OsiCachingClientTests
         var cachingClient = new OsiCachingClient(baseClient, new InMemoryCacheFallback());
 
         // Act
-        await cachingClient.GetBySpdxIdAsync("MIT");
-        await cachingClient.GetBySpdxIdAsync("MIT");
-        await cachingClient.GetByNameAsync("Apache");
-        await cachingClient.GetByNameAsync("Apache");
-        await cachingClient.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
-        await cachingClient.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
-        await cachingClient.GetByStewardAsync("Eclipse");
-        await cachingClient.GetByStewardAsync("Eclipse");
+        await cachingClient.GetBySpdxIdAsync("MIT", TestContext.Current.CancellationToken);
+        await cachingClient.GetBySpdxIdAsync("MIT", TestContext.Current.CancellationToken);
+        await cachingClient.GetByNameAsync("Apache", TestContext.Current.CancellationToken);
+        await cachingClient.GetByNameAsync("Apache", TestContext.Current.CancellationToken);
+        await cachingClient.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity, TestContext.Current.CancellationToken);
+        await cachingClient.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity, TestContext.Current.CancellationToken);
+        await cachingClient.GetByStewardAsync("Eclipse", TestContext.Current.CancellationToken);
+        await cachingClient.GetByStewardAsync("Eclipse", TestContext.Current.CancellationToken);
 
         // Assert
         handler.TotalCalls.ShouldBe(4);
