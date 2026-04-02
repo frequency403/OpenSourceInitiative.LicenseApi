@@ -1,6 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Models;
+
 // ReSharper disable UnusedMemberInSuper.Global
 
 namespace OpenSourceInitiative.LicenseApi.Interfaces;

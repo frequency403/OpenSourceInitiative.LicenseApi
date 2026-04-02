@@ -14,7 +14,7 @@ public class OsiClientTests
         var http = new HttpClient();
 
         // Act
-        using var client = new OsiClient(NullLogger<OsiClient>.Instance, options: null, httpClient: http);
+        using var client = new OsiClient(NullLogger<OsiClient>.Instance, null, http);
 
         // Assert
         http.BaseAddress!.ToString().ShouldBe("https://opensource.org/api/");
@@ -46,7 +46,8 @@ public class OsiClientTests
 
         // Act
         await client.DisposeAsync();
-        var resp = await externalHttp.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.com/"), TestContext.Current.CancellationToken);
+        var resp = await externalHttp.SendAsync(new HttpRequestMessage(HttpMethod.Get, "https://example.com/"),
+            TestContext.Current.CancellationToken);
 
         // Assert
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);

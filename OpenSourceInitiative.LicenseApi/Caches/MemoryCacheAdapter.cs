@@ -3,12 +3,12 @@
 namespace OpenSourceInitiative.LicenseApi.Caches;
 
 /// <summary>
-/// Provides an implementation of the <see cref="ILicenseCache"/> interface using
-/// <see cref="IMemoryCache"/> to store and retrieve cached data in memory.
+///     Provides an implementation of the <see cref="ILicenseCache" /> interface using
+///     <see cref="IMemoryCache" /> to store and retrieve cached data in memory.
 /// </summary>
 internal class MemoryCacheAdapter(IMemoryCache cache) : ILicenseCache
 {
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public ValueTask<T?> GetAsync<T>(string key, CancellationToken ct = default)
     {
         cache.TryGetValue(key, out T? value);
@@ -19,7 +19,7 @@ internal class MemoryCacheAdapter(IMemoryCache cache) : ILicenseCache
 #endif
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public ValueTask SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken ct = default)
     {
         var options = new MemoryCacheEntryOptions();
@@ -35,7 +35,7 @@ internal class MemoryCacheAdapter(IMemoryCache cache) : ILicenseCache
 #endif
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public ValueTask<bool> RemoveAsync(string key, CancellationToken ct = default)
     {
         cache.Remove(key);

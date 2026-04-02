@@ -66,7 +66,7 @@ internal sealed class OsiLicenseKeywordConverter : JsonConverter<OsiLicenseKeywo
 /// </summary>
 internal sealed class OsiLicenseKeywordsConverter : JsonConverter<IReadOnlyCollection<OsiLicenseKeyword>>
 {
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public override IReadOnlyCollection<OsiLicenseKeyword> Read(ref Utf8JsonReader reader, Type typeToConvert,
         JsonSerializerOptions options)
     {
@@ -96,7 +96,7 @@ internal sealed class OsiLicenseKeywordsConverter : JsonConverter<IReadOnlyColle
         return list.AsReadOnly();
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, IReadOnlyCollection<OsiLicenseKeyword> value,
         JsonSerializerOptions options)
     {

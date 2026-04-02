@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+
 // ReSharper disable CheckNamespace
 
 namespace System.Runtime.CompilerServices;

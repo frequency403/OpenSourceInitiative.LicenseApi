@@ -11,10 +11,7 @@ public class ServiceCollectionBaseAddressTests
         // Arrange
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddOsiLicensesClient(o =>
-        {
-            o.BaseAddress = new Uri("https://unit.test/api/");
-        });
+        services.AddOsiLicensesClient(o => { o.BaseAddress = new Uri("https://unit.test/api/"); });
 
         using var sp = services.BuildServiceProvider();
         var factory = sp.GetRequiredService<IHttpClientFactory>();

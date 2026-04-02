@@ -15,10 +15,7 @@ public class LiveApiTests
 #if !DEBUG
         linkedToken.CancelAfter(TimeSpan.FromSeconds(30));
 #endif
-        await foreach (var license in client.GetAllLicensesAsyncEnumerable(linkedToken.Token))
-        {
-            all.Add(license);
-        }
+        await foreach (var license in client.GetAllLicensesAsyncEnumerable(linkedToken.Token)) all.Add(license);
 
         all.ShouldNotBeNull();
         all.ShouldNotBeEmpty();

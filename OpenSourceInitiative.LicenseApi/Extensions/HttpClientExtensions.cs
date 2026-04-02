@@ -1,11 +1,10 @@
-using System.Net;
 using System.Net.Http.Headers;
-#if !NETSTANDARD2_0
-using System.Net.Mime;
-#endif
 using HtmlAgilityPack;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Options;
+#if !NETSTANDARD2_0
+using System.Net.Mime;
+#endif
 
 namespace OpenSourceInitiative.LicenseApi.Extensions;
 
@@ -21,7 +20,7 @@ internal static class HttpClientExtensions
             "application/json"
 #endif
         ;
-    
+
     private const string ClassNameContainingLicenseText = "license-content";
 
     /// <param name="client">The HTTP client used to perform the GET request.</param>
@@ -36,10 +35,16 @@ internal static class HttpClientExtensions
         internal async Task<string> GetLicenseTextAsync(OsiLicense license,
             CancellationToken cancellationToken = default)
         {
-            var response = await client.GetAsync(license.Links.Html.Href, cancellationToken);
-            if((int)response.StatusCode is 301) // Int cast here, enum has moved and moved permanently which causes pattern matching to fail
-                response = await client.GetAsync(new Uri(new Uri("https://opensource.org"), response.Headers.Location), cancellationToken);
-            
+            var uriBuilder = new UriBuilder(license.Links.Html.Href);
+            var response = await client.GetAsync(uriBuilder.Uri, cancellationToken);
+            if ((int)response
+                    .StatusCode is
+                301) // Int cast here, enum has moved and moved permanently which causes pattern matching to fail
+            {
+                uriBuilder.Path = response.Headers.Location.PathAndQuery;
+                response = await client.GetAsync(uriBuilder.Uri, cancellationToken);
+            }
+
             if (!response.IsSuccessStatusCode)
                 throw new HttpRequestException($"Failed to fetch license text for {license}: {response.ReasonPhrase}");
 
@@ -47,7 +52,9 @@ internal static class HttpClientExtensions
             var htmlDocument = new HtmlDocument();
             htmlDocument.Load(stream);
             return HtmlEntity.DeEntitize(htmlDocument.DocumentNode
-                                             .Descendants().FirstOrDefault(n => n.HasClass(ClassNameContainingLicenseText))?.InnerText ??
+                                             .Descendants()
+                                             .FirstOrDefault(n => n.HasClass(ClassNameContainingLicenseText))
+                                             ?.InnerText ??
                                          string.Empty)
                 .Trim();
         }
@@ -59,9 +66,7 @@ internal static class HttpClientExtensions
                 client.DefaultRequestHeaders.Accept.Add(headerValue);
 
             foreach (var productInfoHeaderValue in options.UserAgent)
-            {
                 client.DefaultRequestHeaders.UserAgent.Add(productInfoHeaderValue);
-            }
         }
     }
 }

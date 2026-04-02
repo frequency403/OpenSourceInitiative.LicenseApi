@@ -1,3 +1,4 @@
+using System.Reflection;
 using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
@@ -21,7 +22,8 @@ public class HttpClientExtensionsTests
         };
 
         // Act
-        var method = typeof(HttpClientExtensions).GetMethod("GetLicenseTextAsync", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var method =
+            typeof(HttpClientExtensions).GetMethod("GetLicenseTextAsync", BindingFlags.Static | BindingFlags.NonPublic);
         var textTask = (Task<string>)method!.Invoke(null, [http, lic, CancellationToken.None])!;
         var text = await textTask;
 
