@@ -1,8 +1,6 @@
-#if !NETSTANDARD2_0
-using System.Net.Http.Json;
-#else
+using System.Runtime.CompilerServices;
 using System.Text.Json;
-#endif
+using System.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OpenSourceInitiative.LicenseApi.Converter;
@@ -15,22 +13,17 @@ using OpenSourceInitiative.LicenseApi.Options;
 namespace OpenSourceInitiative.LicenseApi.Clients;
 
 /// <summary>
-/// Provides functionality to interact with the Open Source Initiative (OSI) License API.
-/// The OsiClient allows searching, retrieving, and enumerating OSI-approved licenses
-/// using various parameters such as SPDX ID, name, keyword, and steward.
+///     Provides functionality to interact with the Open Source Initiative (OSI) License API.
+///     The OsiClient allows searching, retrieving, and enumerating OSI-approved licenses
+///     using various parameters such as SPDX ID, name, keyword, and steward.
 /// </summary>
-public class OsiClient : IOsiClient
+public sealed class OsiClient : IOsiClient
 {
-    private const string AllLicensesEndpoint = "license";
-    private const string SingleLicenseEndpoint = "license/{0}";
-    private const string NameFilter = "name={0}";
-    private const string KeywordFilter = "keyword={0}";
-    private const string StewardFilter = "steward={0}";
-    private const string SpdxFilter = "spdx={0}";
+    private const string LicenseEndpoint = "license";
+    private readonly Uri _baseAddress;
+    private readonly bool _disposeHttpClient;
 
     private readonly HttpClient _httpClient;
-    private readonly bool _disposeHttpClient;
-    private readonly OsiClientOptions _options;
     private readonly ILogger<OsiClient> _logger;
 
     public OsiClient(
@@ -38,22 +31,37 @@ public class OsiClient : IOsiClient
         OsiClientOptions? options = null,
         HttpClient? httpClient = null)
     {
-        _options = options ?? new OsiClientOptions();
         _httpClient = httpClient ?? new HttpClient();
-        _httpClient.ConfigureForLicenseApi(_options);
+        var option = options ?? new OsiClientOptions();
+        _baseAddress = new Uri(option.BaseAddress, LicenseEndpoint);
+        _httpClient.ConfigureForLicenseApi(option);
         _disposeHttpClient = httpClient == null;
         _logger = logger ?? NullLogger<OsiClient>.Instance;
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()
+    public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable(
+        [EnumeratorCancellation] CancellationToken token = default)
     {
+        var httpResponse = await _httpClient.GetAsync(_baseAddress, token);
+        try
+        {
+            httpResponse.EnsureSuccessStatusCode();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to fetch licenses from {Endpoint}", _baseAddress);
+            throw;
+        }
+
 #if !NETSTANDARD2_0
-        await foreach (var license in _httpClient.GetFromJsonAsAsyncEnumerable<OsiLicense>(AllLicensesEndpoint))
+        await using var responseStream = await httpResponse.Content.ReadAsStreamAsync(token);
 #else
-        await foreach (var license in JsonSerializer.DeserializeAsyncEnumerable<OsiLicense?>(
-                           await (await _httpClient.GetAsync(AllLicensesEndpoint)).Content.ReadAsStreamAsync()))
+        using var responseStream = await httpResponse.Content.ReadAsStreamAsync();
 #endif
+
+        await foreach (var license in JsonSerializer.DeserializeAsyncEnumerable<OsiLicense?>(responseStream,
+                           cancellationToken: token))
         {
             _logger.LogTrace("Fetched license {License}", license);
             if (license is null)
@@ -62,92 +70,71 @@ public class OsiClient : IOsiClient
                 continue;
             }
 
-            license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
+            try
+            {
+                license.LicenseText = await _httpClient.GetLicenseTextAsync(license, token);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Failed to fetch license text for {License}", license);
+            }
+
             yield return license;
         }
     }
 
-    private enum LicenseEndpointType
-    {
-        SpdxId,
-        Name,
-        Keyword,
-        Steward
-    }
-
     /// <inheritdoc />
-    public async Task<OsiLicense?> GetByOsiIdAsync(string id)
+    public async Task<OsiLicense?> GetByOsiIdAsync(string id, CancellationToken token = default)
     {
-        var license =
+        if (_httpClient.BaseAddress is null)
+            throw new InvalidOperationException("Base address is not set");
+        var uri = new Uri(_baseAddress, id);
+        var httpResponse = await _httpClient.GetAsync(uri, token);
+        try
+        {
+            httpResponse.EnsureSuccessStatusCode();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to retrieve license with ID {Id}", id);
+            throw;
+        }
+
 #if !NETSTANDARD2_0
-            await _httpClient.GetFromJsonAsync<OsiLicense?>(string.Format(SingleLicenseEndpoint, id));
+        await using var responseStream = await httpResponse.Content.ReadAsStreamAsync(token);
 #else
-            await JsonSerializer.DeserializeAsync<OsiLicense?>((await _httpClient.GetStreamAsync(string.Format(SingleLicenseEndpoint, id))));
+        using var responseStream = await httpResponse.Content.ReadAsStreamAsync();
 #endif
-        if (license is null) return null;
-        license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
+
+        if (await JsonSerializer.DeserializeAsync<OsiLicense?>(responseStream, cancellationToken: token) is not
+            { } license) return null;
+        license.LicenseText = await _httpClient.GetLicenseTextAsync(license, token);
         return license;
     }
 
     /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id) => GetLicenseBy(LicenseEndpointType.SpdxId, id);
-
-    /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name) => GetLicenseBy(LicenseEndpointType.Name, name);
-
-    /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword) =>
-        GetLicenseBy(LicenseEndpointType.Keyword, OsiLicenseKeywordMapping.ToApiValue(keyword));
-
-    /// <inheritdoc />
-    public Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward) =>
-        GetLicenseBy(LicenseEndpointType.Steward, steward);
-
-    /// <summary>
-    /// Retrieves a collection of licenses matching the specified criteria.
-    /// </summary>
-    /// <param name="type">
-    /// The type of filter to apply when searching for licenses. This determines the query parameter used in the API request.
-    /// </param>
-    /// <param name="value">
-    /// The value to filter by, corresponding to the selected filter type (e.g., SPDX ID, name, keyword, or steward).
-    /// </param>
-    /// <returns>
-    /// A task that represents the asynchronous operation. The task result contains an enumerable collection of <see cref="OsiLicense"/> objects matching the specified criteria.
-    /// </returns>
-    /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown when an invalid <paramref name="type"/> is provided.
-    /// </exception>
-    private async Task<IEnumerable<OsiLicense?>> GetLicenseBy(LicenseEndpointType type, string value)
+    public Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id, CancellationToken token = default)
     {
-        var query = string.Join("?", AllLicensesEndpoint, string.Format(type switch
-        {
-            LicenseEndpointType.SpdxId => SpdxFilter,
-            LicenseEndpointType.Name => NameFilter,
-            LicenseEndpointType.Keyword => KeywordFilter,
-            LicenseEndpointType.Steward => StewardFilter,
-            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
-        }, value));
-        _logger.LogTrace("Querying with {Query}", string.Join("", _httpClient.BaseAddress, query));
+        return GetLicenseBy(LicenseEndpointType.Spdx, id, token);
+    }
 
-        if (
-#if !NETSTANDARD2_0
-            (await _httpClient.GetFromJsonAsync<OsiLicense?[]?>(query)) is { } remoteLicenses
-#else
-            (await JsonSerializer.DeserializeAsync<OsiLicense?[]?>(await (await _httpClient.GetAsync(query)).Content.ReadAsStreamAsync())) is { } remoteLicenses
-#endif
-        )
-        {
-           var listOfLicensesWithLicenseText = new List<OsiLicense>();
-           foreach (var license in remoteLicenses)
-           {
-               if(license is null) continue;
-               license.LicenseText = await _httpClient.GetLicenseTextAsync(license);
-               listOfLicensesWithLicenseText.Add(license);
-           }
-           return listOfLicensesWithLicenseText;
-        }
-        return [];
+    /// <inheritdoc />
+    public Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name, CancellationToken token = default)
+    {
+        return GetLicenseBy(LicenseEndpointType.Name, name, token);
+    }
+
+    /// <inheritdoc />
+    public Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword,
+        CancellationToken token = default)
+    {
+        return GetLicenseBy(LicenseEndpointType.Keyword, OsiLicenseKeywordMapping.ToApiValue(keyword), token);
+    }
+
+    /// <inheritdoc />
+    public Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward, CancellationToken token = default)
+    {
+        return GetLicenseBy(LicenseEndpointType.Steward, steward, token);
     }
 
     /// <inheritdoc />
@@ -163,5 +150,75 @@ public class OsiClient : IOsiClient
         if (_disposeHttpClient)
             _httpClient.Dispose();
         return new ValueTask(Task.CompletedTask);
+    }
+
+    /// <summary>
+    ///     Retrieves a collection of licenses matching the specified criteria.
+    /// </summary>
+    /// <param name="type">
+    ///     The type of filter to apply when searching for licenses. This determines the query parameter used in the API
+    ///     request.
+    /// </param>
+    /// <param name="value">
+    ///     The value to filter by, corresponding to the selected filter type (e.g., SPDX ID, name, keyword, or steward).
+    /// </param>
+    /// <param name="token">The cancellation token.</param>
+    /// <returns>
+    ///     A task that represents the asynchronous operation. The task result contains an enumerable collection of
+    ///     <see cref="OsiLicense" /> objects matching the specified criteria.
+    /// </returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    ///     Thrown when an invalid <paramref name="type" /> is provided.
+    /// </exception>
+    private async Task<IEnumerable<OsiLicense?>> GetLicenseBy(LicenseEndpointType type, string value,
+        CancellationToken token = default)
+    {
+        if (_httpClient.BaseAddress is null)
+            throw new InvalidOperationException("Base address is not set");
+
+        var uriBuilder = new UriBuilder(_baseAddress);
+        var queryString = HttpUtility.ParseQueryString(uriBuilder.Query);
+        queryString.Add(type.ToString().ToLower(), value);
+        uriBuilder.Query = queryString.ToString();
+
+        _logger.LogTrace("Querying with {Query}", uriBuilder.Uri);
+
+        var httpResponse = await _httpClient.GetAsync(uriBuilder.Uri, token);
+        try
+        {
+            httpResponse.EnsureSuccessStatusCode();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failed to fetch licenses from {Endpoint}", LicenseEndpoint);
+            throw;
+        }
+
+#if !NETSTANDARD2_0
+        await using var responseStream = await httpResponse.Content.ReadAsStreamAsync(token);
+#else
+        using var responseStream = await httpResponse.Content.ReadAsStreamAsync();
+#endif
+
+        if (await JsonSerializer.DeserializeAsync<OsiLicense?[]?>(responseStream, cancellationToken: token) is not
+            { } remoteLicenses)
+            return [];
+        var listOfLicensesWithLicenseText = new List<OsiLicense>();
+        foreach (var license in remoteLicenses)
+        {
+            if (license is null) continue;
+            license.LicenseText = await _httpClient.GetLicenseTextAsync(license, token);
+            listOfLicensesWithLicenseText.Add(license);
+        }
+
+        return listOfLicensesWithLicenseText;
+    }
+
+    private enum LicenseEndpointType
+    {
+        Spdx,
+        Name,
+        Keyword,
+        Steward
     }
 }

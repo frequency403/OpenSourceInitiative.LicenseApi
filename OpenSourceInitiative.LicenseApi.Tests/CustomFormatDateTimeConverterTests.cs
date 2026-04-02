@@ -16,12 +16,6 @@ public class CustomFormatDateTimeConverterTests
         return opts;
     }
 
-    private record Temp
-    {
-        [JsonPropertyName("submission_date")] public DateTime? SubmissionDate { get; init; }
-        [JsonPropertyName("approval_date")] public DateTime? ApprovalDate { get; init; }
-    }
-
     [Fact]
     public void Deserializes_Dates_In_yyyyMMdd_Format()
     {
@@ -89,5 +83,11 @@ public class CustomFormatDateTimeConverterTests
         // Assert
         json.ShouldContain("\"submission_date\":\"20241231\"");
         json.ShouldContain("\"approval_date\":\"20250101\"");
+    }
+
+    private record Temp
+    {
+        [JsonPropertyName("submission_date")] public DateTime? SubmissionDate { get; init; }
+        [JsonPropertyName("approval_date")] public DateTime? ApprovalDate { get; init; }
     }
 }

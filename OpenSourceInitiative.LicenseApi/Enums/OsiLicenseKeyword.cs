@@ -1,7 +1,7 @@
 namespace OpenSourceInitiative.LicenseApi.Enums;
 
 /// <summary>
-///    OSI classification keywords available for licenses.
+///     OSI classification keywords available for licenses.
 /// </summary>
 public enum OsiLicenseKeyword
 {

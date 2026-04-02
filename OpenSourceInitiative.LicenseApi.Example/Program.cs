@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Enums;
 using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
@@ -13,10 +12,7 @@ var services = new ServiceCollection();
 services.AddLogging(b => b.AddConsole());
 
 // Register with caching enabled by default
-services.AddOsiLicensesClient(options =>
-{
-    options.EnableCaching = true;
-});
+services.AddOsiLicensesClient(options => { options.EnableCaching = true; });
 
 await using var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<IOsiClient>();

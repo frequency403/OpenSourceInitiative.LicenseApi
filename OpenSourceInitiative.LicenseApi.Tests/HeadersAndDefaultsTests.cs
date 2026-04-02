@@ -8,7 +8,8 @@ public class HeadersAndDefaultsTests
     [Theory]
     [InlineData(false, "application/json", "OpenSourceInitiative.LicenseApi")] // library default UA is assembly name
     [InlineData(true, "text/plain", "CustomAgent")] // pre-set headers -> additional defaults are appended
-    public void Constructor_Sets_Defaults_And_Appends_If_Preset(bool prePopulate, string expectedAccept, string expectedUaName)
+    public void Constructor_Sets_Defaults_And_Appends_If_Preset(bool prePopulate, string expectedAccept,
+        string expectedUaName)
     {
         // Arrange
         var http = new HttpClient();
@@ -38,7 +39,8 @@ public class HeadersAndDefaultsTests
 
             // UA should include both the custom and the default
             http.DefaultRequestHeaders.UserAgent.ShouldContain(x => x.Product!.Name == expectedUaName);
-            http.DefaultRequestHeaders.UserAgent.ShouldContain(x => x.Product!.Name == "OpenSourceInitiative.LicenseApi");
+            http.DefaultRequestHeaders.UserAgent.ShouldContain(x =>
+                x.Product!.Name == "OpenSourceInitiative.LicenseApi");
         }
     }
 }
