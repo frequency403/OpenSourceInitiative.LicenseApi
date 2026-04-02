@@ -14,7 +14,8 @@ public static class ServiceCollectionExtensions
     internal const string OsiClientNonCachingName = "OsiNonCachingClient";
 
     /// <summary>
-    ///     Registers <see cref="OpenSourceInitiative.LicenseApi.Interfaces.IOsiClient" /> as a typed client using <see cref="System.Net.Http.IHttpClientFactory" />.
+    ///     Registers <see cref="OpenSourceInitiative.LicenseApi.Interfaces.IOsiClient" /> as a typed client using
+    ///     <see cref="System.Net.Http.IHttpClientFactory" />.
     ///     Supports optional base address configuration and a custom primary handler.
     /// </summary>
     /// <param name="services">The service collection.</param>
@@ -38,15 +39,11 @@ public static class ServiceCollectionExtensions
         configure?.Invoke(options);
 
         // 1. Configure HttpClient for the underlying OsiClient
-        var clientBuilder = services.AddHttpClient(OsiClientName, client =>
-        {
-            client.ConfigureForLicenseApi(options);
-        });
+        var clientBuilder =
+            services.AddHttpClient(OsiClientName, client => { client.ConfigureForLicenseApi(options); });
 
         if (options.PrimaryHandlerFactory is not null)
-        {
             clientBuilder.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
-        }
 
         // 2. Register the appropriate IOsiClient
         if (options.EnableCaching)

@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using Microsoft.Extensions.DependencyInjection;
 using OpenSourceInitiative.LicenseApi.Extensions;
 
@@ -21,7 +20,8 @@ public class ServiceCollectionHeadersTests
 
         // Assert
         http.DefaultRequestHeaders.Accept.ShouldContain(x => x.MediaType == "application/json");
-        http.DefaultRequestHeaders.UserAgent.ShouldContain(x => x.Product != null && x.Product.Name == "OpenSourceInitiative.LicenseApi");
+        http.DefaultRequestHeaders.UserAgent.ShouldContain(x =>
+            x.Product != null && x.Product.Name == "OpenSourceInitiative.LicenseApi");
         http.BaseAddress!.ToString().ShouldBe("https://opensource.org/api/");
     }
 }

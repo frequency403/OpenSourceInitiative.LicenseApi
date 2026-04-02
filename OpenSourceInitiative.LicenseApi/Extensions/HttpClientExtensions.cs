@@ -1,10 +1,10 @@
 using System.Net.Http.Headers;
-#if !NETSTANDARD2_0
-using System.Net.Mime;
-#endif
 using HtmlAgilityPack;
 using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Options;
+#if !NETSTANDARD2_0
+using System.Net.Mime;
+#endif
 
 namespace OpenSourceInitiative.LicenseApi.Extensions;
 
@@ -20,42 +20,53 @@ internal static class HttpClientExtensions
             "application/json"
 #endif
         ;
-    
+
     private const string ClassNameContainingLicenseText = "license-content";
 
-    /// <summary>
-    ///     Downloads and extracts the human-readable license text from the license HTML page.
-    /// </summary>
     /// <param name="client">The HTTP client used to perform the GET request.</param>
-    /// <param name="license">The license whose <see cref="OsiLicenseLinks.Html" /> link is used.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Plain text content of the HTML node with class 'license-content', or an empty string if not found.</returns>
-    internal static async Task<string> GetLicenseTextAsync(this HttpClient client, OsiLicense license,
-        CancellationToken cancellationToken = default)
+    extension(HttpClient client)
     {
-        var stream = await client.GetStreamAsync(license.Links.Html.Href
-#if !NETSTANDARD2_0
-            , cancellationToken
-#endif
-        );
-
-        var htmlDocument = new HtmlDocument();
-        htmlDocument.Load(stream);
-        return HtmlEntity.DeEntitize(htmlDocument.DocumentNode
-                .Descendants().FirstOrDefault(n => n.HasClass(ClassNameContainingLicenseText))?.InnerText ??
-            string.Empty)
-            .Trim();
-    }
-
-    internal static void ConfigureForLicenseApi(this HttpClient client, OsiClientOptions options)
-    {
-        client.BaseAddress ??= options.BaseAddress;
-        if (MediaTypeWithQualityHeaderValue.TryParse(ApplicationJsonMediaType, out var headerValue))
-            client.DefaultRequestHeaders.Accept.Add(headerValue);
-
-        foreach (var productInfoHeaderValue in options.UserAgent)
+        /// <summary>
+        ///     Downloads and extracts the human-readable license text from the license HTML page.
+        /// </summary>
+        /// <param name="license">The license whose <see cref="OsiLicenseLinks.Html" /> link is used.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Plain text content of the HTML node with class 'license-content', or an empty string if not found.</returns>
+        internal async Task<string> GetLicenseTextAsync(OsiLicense license,
+            CancellationToken cancellationToken = default)
         {
-            client.DefaultRequestHeaders.UserAgent.Add(productInfoHeaderValue);
+            var uriBuilder = new UriBuilder(license.Links.Html.Href);
+            var response = await client.GetAsync(uriBuilder.Uri, cancellationToken);
+            if ((int)response
+                    .StatusCode is
+                301) // Int cast here, enum has moved and moved permanently which causes pattern matching to fail
+            {
+                uriBuilder.Path = response.Headers.Location.PathAndQuery;
+                response = await client.GetAsync(uriBuilder.Uri, cancellationToken);
+            }
+
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Failed to fetch license text for {license}: {response.ReasonPhrase}");
+
+            using var stream = await response.Content.ReadAsStreamAsync();
+            var htmlDocument = new HtmlDocument();
+            htmlDocument.Load(stream);
+            return HtmlEntity.DeEntitize(htmlDocument.DocumentNode
+                                             .Descendants()
+                                             .FirstOrDefault(n => n.HasClass(ClassNameContainingLicenseText))
+                                             ?.InnerText ??
+                                         string.Empty)
+                .Trim();
+        }
+
+        internal void ConfigureForLicenseApi(OsiClientOptions options)
+        {
+            client.BaseAddress ??= options.BaseAddress;
+            if (MediaTypeWithQualityHeaderValue.TryParse(ApplicationJsonMediaType, out var headerValue))
+                client.DefaultRequestHeaders.Accept.Add(headerValue);
+
+            foreach (var productInfoHeaderValue in options.UserAgent)
+                client.DefaultRequestHeaders.UserAgent.Add(productInfoHeaderValue);
         }
     }
 }
