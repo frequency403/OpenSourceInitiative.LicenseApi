@@ -3,7 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Extensions;
 using OpenSourceInitiative.LicenseApi.Interfaces;
+using OpenSourceInitiative.LicenseApi.Models;
 using OpenSourceInitiative.LicenseApi.Tests.Utils;
+
+using OpenSourceInitiative.LicenseApi.Clients;
 
 namespace OpenSourceInitiative.LicenseApi.Tests;
 
