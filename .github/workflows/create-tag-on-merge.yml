@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Create tag if missing
         id: tag
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const owner = context.repo.owner;
@@ -62,7 +62,7 @@ jobs:
             core.setOutput("tag", tag);
 
       - name: Dispatch publish workflow for the created tag
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const owner = context.repo.owner;

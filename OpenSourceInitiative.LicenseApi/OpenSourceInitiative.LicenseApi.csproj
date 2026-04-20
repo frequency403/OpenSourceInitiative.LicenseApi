@@ -13,16 +13,16 @@
         <InternalsVisibleTo Include="OpenSourceInitiative.LicenseApi.Tests"/>
         <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
         <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
-        <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.5" />
-        <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.5" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.5" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
-        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
+        <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.6" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-      <PackageReference Include="System.Text.Json" Version="10.0.5" />
+      <PackageReference Include="System.Text.Json" Version="10.0.6" />
             </ItemGroup>
 
 </Project>
