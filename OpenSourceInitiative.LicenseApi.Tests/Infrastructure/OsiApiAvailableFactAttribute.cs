@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using OpenSourceInitiative.LicenseApi.Options;
 
 // ReSharper disable ExplicitCallerInfoArgument
 
@@ -14,8 +15,6 @@ namespace OpenSourceInitiative.LicenseApi.Tests.Infrastructure;
 /// </remarks>
 public sealed class OsiApiAvailableFactAttribute : FactAttribute
 {
-    private const string DefaultBaseUrl = "https://opensource.org/api/license";
-
     public OsiApiAvailableFactAttribute([CallerFilePath] string? sourceFilePath = null,
         [CallerLineNumber] int sourceLineNumber = 0) : base(sourceFilePath, sourceLineNumber)
     {
@@ -25,7 +24,7 @@ public sealed class OsiApiAvailableFactAttribute : FactAttribute
                 return;
 
             // Quick TCP reachability check on port 443 to avoid HTTP stack overhead
-            var host = new Uri(DefaultBaseUrl).Host;
+            var host = new OsiClientOptions().BaseAddress.Host;
             using var tcp = new TcpClient();
             var result = tcp.BeginConnect(host, 443, null, null);
             if (!result.AsyncWaitHandle.WaitOne(TimeSpan.FromSeconds(20)))

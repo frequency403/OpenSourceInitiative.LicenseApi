@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Web;
@@ -31,8 +32,8 @@ public sealed class OsiClient : IOsiClient
         OsiClientOptions? options = null,
         HttpClient? httpClient = null)
     {
-        _httpClient = httpClient ?? new HttpClient();
         var option = options ?? new OsiClientOptions();
+        _httpClient = httpClient ?? new HttpClient(option.HttpClientHandler);
         _baseAddress = new Uri(option.BaseAddress, LicenseEndpoint);
         _httpClient.ConfigureForLicenseApi(option);
         _disposeHttpClient = httpClient == null;
@@ -63,12 +64,14 @@ public sealed class OsiClient : IOsiClient
         await foreach (var license in JsonSerializer.DeserializeAsyncEnumerable<OsiLicense?>(responseStream,
                            cancellationToken: token))
         {
-            _logger.LogTrace("Fetched license {License}", license);
+            
             if (license is null)
             {
-                yield return license;
+                _logger.LogWarning("Failed to fetch license {License}", license);
+                yield return null;
                 continue;
             }
+            _logger.LogDebug("Fetched license {License}", license);
 
             try
             {
