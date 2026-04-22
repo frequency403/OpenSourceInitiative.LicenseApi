@@ -1,11 +1,42 @@
 version: 2
+
 updates:
-  - package-ecosystem: "nuget"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Berlin"
+    
+    # Cap the number of open Dependabot PRs at any one time
+    open-pull-requests-limit: 5
+    
+    # Group all dependency updates into a single PR per run,
+    # regardless of semver bump type (patch, minor, major)
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    
+    # Keep major version bumps as separate PRs — those need manual review
+    # (remove this block if you want majors grouped too)
+    ignore: []
+    
+    labels:
+      - "dependencies"
+      - "nuget"
+    
+    commit-message:
+      prefix: "chore(deps)"
+      signoff: true
