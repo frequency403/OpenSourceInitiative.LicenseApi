@@ -1,0 +1,64 @@
+name: Version Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+jobs:
+  compare-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout base (${{ github.event.pull_request.base.ref }})
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Checkout head (${{ github.event.pull_request.head.ref }})
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: head
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+
+      - name: Compare versions
+        shell: bash
+        run: |
+          BASE="$(dotnet msbuild base/Directory.Build.props -nologo -getProperty:Version | tr -d '\r')"
+          TARGET="$(dotnet msbuild head/Directory.Build.props -nologo -getProperty:Version | tr -d '\r')"
+
+          echo "Base:   $BASE"
+          echo "Target: $TARGET"
+
+          if ! [[ "$BASE" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid base version: $BASE"
+            exit 1
+          fi
+
+          if ! [[ "$TARGET" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid target version: $TARGET"
+            exit 1
+          fi
+
+          python3 - << EOF
+          import sys
+
+          base = tuple(map(int, "$BASE".split(".")))
+          target = tuple(map(int, "$TARGET".split(".")))
+
+          if target <= base:
+              print(f"::error::Release version {'.'.join(map(str, target))} must be greater than base {'.'.join(map(str, base))}")
+              sys.exit(1)
+
+          print("::notice::Version check passed")
+          EOF
