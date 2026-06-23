@@ -25,11 +25,11 @@ internal class DistributedCacheAdapter(IDistributedCache cache) : ILicenseCache
     /// <inheritdoc />
     public async ValueTask SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken ct = default)
     {
-        byte[] bytes = [];
+        byte[] bytes;
         using (var memoryStream = new MemoryStream())
         {
             await JsonSerializer.SerializeAsync(memoryStream, value, cancellationToken: ct);
-            memoryStream.ToArray();
+            bytes = memoryStream.ToArray();
         }
 
         var options = new DistributedCacheEntryOptions();
@@ -43,7 +43,14 @@ internal class DistributedCacheAdapter(IDistributedCache cache) : ILicenseCache
     /// <inheritdoc />
     public async ValueTask<bool> RemoveAsync(string key, CancellationToken ct = default)
     {
-        await cache.RemoveAsync(key, ct);
-        return await cache.GetAsync(key, ct) is null;
+        try
+        {
+            await cache.RemoveAsync(key, ct);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

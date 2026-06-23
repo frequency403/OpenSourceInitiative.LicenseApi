@@ -109,36 +109,13 @@ internal sealed class OsiCachingClient(
         await cache.SetAsync(key, licenseList, ct: token);
         return licenseList;
     }
+    
+    public void Dispose() => client.Dispose();
 
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await DisposeAsyncCore();
-        GC.SuppressFinalize(this);
-    }
+    public async ValueTask DisposeAsync() => await client.DisposeAsync();
 
     private ValueTask<List<OsiLicense?>?> GetLicenseFromCacheByKeyAsync(string key, CancellationToken token)
     {
         return cache.GetAsync<List<OsiLicense?>>(key, token);
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (disposing) client.Dispose();
-    }
-
-    private async ValueTask DisposeAsyncCore()
-    {
-        await client.DisposeAsync();
-    }
-
-    ~OsiCachingClient()
-    {
-        Dispose(false);
     }
 }

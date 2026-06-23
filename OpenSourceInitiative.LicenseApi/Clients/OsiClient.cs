@@ -31,8 +31,8 @@ public sealed class OsiClient : IOsiClient
         OsiClientOptions? options = null,
         HttpClient? httpClient = null)
     {
-        _httpClient = httpClient ?? new HttpClient();
         var option = options ?? new OsiClientOptions();
+        _httpClient = httpClient ?? new HttpClient(option.HttpClientHandler);
         _baseAddress = new Uri(option.BaseAddress, LicenseEndpoint);
         _httpClient.ConfigureForLicenseApi(option);
         _disposeHttpClient = httpClient == null;
@@ -43,7 +43,7 @@ public sealed class OsiClient : IOsiClient
     public async IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable(
         [EnumeratorCancellation] CancellationToken token = default)
     {
-        var httpResponse = await _httpClient.GetAsync(_baseAddress, token);
+        using var httpResponse = await _httpClient.GetAsync(_baseAddress, token);
         try
         {
             httpResponse.EnsureSuccessStatusCode();
@@ -60,15 +60,19 @@ public sealed class OsiClient : IOsiClient
         using var responseStream = await httpResponse.Content.ReadAsStreamAsync();
 #endif
 
+        var index = 0;
         await foreach (var license in JsonSerializer.DeserializeAsyncEnumerable<OsiLicense?>(responseStream,
                            cancellationToken: token))
         {
-            _logger.LogTrace("Fetched license {License}", license);
             if (license is null)
             {
-                yield return license;
+                _logger.LogWarning("Null license deserialized at index {Index}", index);
+                index++;
+                yield return null;
                 continue;
             }
+
+            _logger.LogDebug("Fetched license {License}", license);
 
             try
             {
@@ -79,6 +83,7 @@ public sealed class OsiClient : IOsiClient
                 _logger.LogError(e, "Failed to fetch license text for {License}", license);
             }
 
+            index++;
             yield return license;
         }
     }
@@ -86,10 +91,8 @@ public sealed class OsiClient : IOsiClient
     /// <inheritdoc />
     public async Task<OsiLicense?> GetByOsiIdAsync(string id, CancellationToken token = default)
     {
-        if (_httpClient.BaseAddress is null)
-            throw new InvalidOperationException("Base address is not set");
         var uri = new Uri(_baseAddress, id);
-        var httpResponse = await _httpClient.GetAsync(uri, token);
+        using var httpResponse = await _httpClient.GetAsync(uri, token);
         try
         {
             httpResponse.EnsureSuccessStatusCode();
@@ -149,41 +152,24 @@ public sealed class OsiClient : IOsiClient
     {
         if (_disposeHttpClient)
             _httpClient.Dispose();
-        return new ValueTask(Task.CompletedTask);
+#if !NETSTANDARD2_0
+        return ValueTask.CompletedTask;
+#else
+        return new ValueTask();
+#endif
     }
 
-    /// <summary>
-    ///     Retrieves a collection of licenses matching the specified criteria.
-    /// </summary>
-    /// <param name="type">
-    ///     The type of filter to apply when searching for licenses. This determines the query parameter used in the API
-    ///     request.
-    /// </param>
-    /// <param name="value">
-    ///     The value to filter by, corresponding to the selected filter type (e.g., SPDX ID, name, keyword, or steward).
-    /// </param>
-    /// <param name="token">The cancellation token.</param>
-    /// <returns>
-    ///     A task that represents the asynchronous operation. The task result contains an enumerable collection of
-    ///     <see cref="OsiLicense" /> objects matching the specified criteria.
-    /// </returns>
-    /// <exception cref="ArgumentOutOfRangeException">
-    ///     Thrown when an invalid <paramref name="type" /> is provided.
-    /// </exception>
     private async Task<IEnumerable<OsiLicense?>> GetLicenseBy(LicenseEndpointType type, string value,
         CancellationToken token = default)
     {
-        if (_httpClient.BaseAddress is null)
-            throw new InvalidOperationException("Base address is not set");
-
         var uriBuilder = new UriBuilder(_baseAddress);
         var queryString = HttpUtility.ParseQueryString(uriBuilder.Query);
-        queryString.Add(type.ToString().ToLower(), value);
+        queryString.Add(type.ToString().ToLowerInvariant(), value);
         uriBuilder.Query = queryString.ToString();
 
         _logger.LogTrace("Querying with {Query}", uriBuilder.Uri);
 
-        var httpResponse = await _httpClient.GetAsync(uriBuilder.Uri, token);
+        using var httpResponse = await _httpClient.GetAsync(uriBuilder.Uri, token);
         try
         {
             httpResponse.EnsureSuccessStatusCode();

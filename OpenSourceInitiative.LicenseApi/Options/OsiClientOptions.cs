@@ -49,4 +49,13 @@ public sealed class OsiClientOptions
         new(Assembly.GetExecutingAssembly().GetName().Name ?? "OpenSourceInitiative.LicenseApi",
             Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty)
     };
+
+    /// <summary>
+    /// Gets or sets the HTTP client handler used to configure the low-level HTTP settings
+    /// for requests made by the OSI licenses client.
+    /// </summary>
+    public HttpClientHandler HttpClientHandler { get; set; } = new()
+    {
+        AllowAutoRedirect = true
+    };
 }
