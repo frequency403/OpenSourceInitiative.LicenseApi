@@ -25,16 +25,22 @@ internal class InMemoryCacheFallback : ILicenseCache
         {
             if (entry.expires is null || entry.expires > DateTimeOffset.UtcNow)
 #if !NETSTANDARD2_0
-                return ValueTask.FromResult((T?)entry.value);
+            return ValueTask.FromResult((T?)entry.value);
 #else
                 return new ValueTask<T?>((T?)entry.value);
 #endif
 
+            // only remove the expired entry, not a potentially fresher one written concurrently
+#if !NETSTANDARD2_0
+        _cache.TryRemove(new KeyValuePair<string, (object, DateTimeOffset?)>(key, entry));
+#else
+            // KeyValuePair overload unavailable on netstandard2.0 — accept the narrow TOCTOU window
             _cache.TryRemove(key, out _);
+#endif
         }
 
 #if !NETSTANDARD2_0
-        return ValueTask.FromResult(default(T?));
+    return ValueTask.FromResult(default(T?));
 #else
         return new ValueTask<T?>();
 #endif

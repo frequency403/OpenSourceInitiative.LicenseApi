@@ -40,9 +40,9 @@ internal class MemoryCacheAdapter(IMemoryCache cache) : ILicenseCache
     {
         cache.Remove(key);
 #if !NETSTANDARD2_0
-        return ValueTask.FromResult(cache.Get(key) is null);
+        return ValueTask.FromResult(true);
 #else
-        return new ValueTask<bool>(cache.Get(key) is null);
+        return new ValueTask<bool>(true);
 #endif
     }
 }
