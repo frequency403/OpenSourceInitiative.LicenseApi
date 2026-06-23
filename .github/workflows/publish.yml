@@ -1,13 +1,13 @@
 name: Publish NuGet
 
 on:
-  workflow_dispatch:
   push:
     tags:
       - "v*.*.*"
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   pack-and-publish:
@@ -16,38 +16,27 @@ jobs:
 
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
+          ref: ${{ github.ref }}
           fetch-depth: 0
-
-      - name: Resolve version from tag + ensure tag is on main
-        id: gate
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          TAG="${GITHUB_REF_NAME}"     # vM.m.P
-          VERSION="${TAG#v}"           # M.m.P
-
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Tag '$TAG' is not SemVer (vM.m.P)."
-            exit 1
-          fi
-
-          # Ensure the tagged commit is reachable from main
-          git fetch origin main --tags --force
-          if ! git branch -r --contains HEAD | grep -qE 'origin/main$'; then
-            echo "Tagged commit is not contained in origin/main; refusing to publish."
-            exit 1
-          fi
-
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v5
+          
+      - name: Get version
+        uses: ./.github/actions/get-version
+        id: gate
         with:
-          dotnet-version: "10.0.x"
+          file-name: Directory.Build.props
+          
+      - name: Verify tag matches project version
+        shell: bash
+        run: |
+          if [[ "${{ github.ref_name }}" != "${{ steps.gate.outputs.tag }}" ]]; then
+            echo "::error::Git tag ${{ github.ref_name }} does not match project version ${{ steps.gate.outputs.tag }}"
+            exit 1
+          fi
 
       - name: Restore
         run: dotnet restore
@@ -62,18 +51,22 @@ jobs:
           --no-build
           -p:PackageVersion=${{ steps.gate.outputs.version }}
           -p:ContinuousIntegrationBuild=true
+          
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
 
       - name: Publish to NuGet.org
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: >-
           dotnet nuget push "./nupkg/*.nupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
       - name: Create GitHub Release and upload packages
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.gate.outputs.tag }}
           name: ${{ steps.gate.outputs.tag }}

@@ -1,136 +1,196 @@
-# OpenSourceInitiative.LicenseApi (C#/.NET)
+# OpenSourceInitiative.LicenseApi 
+[![CI](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml/badge.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![NuGet Version](https://img.shields.io/nuget/v/OpenSourceInitiative.LicenseApi?style=flat)
 
-[![CI](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml/badge.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A lightweight and resilient .NET client for the Open Source Initiative (OSI) License API. This library provides a
-structured way to query OSI-approved licenses, including streaming support and automatic license text extraction.
+A lightweight, multi-targeted (.NET 10 / netstandard2.0) client library for the [Open Source Initiative License API](https://opensource.org/api). Fetches the full OSI license catalog, supports filtering by SPDX ID, name, keyword, and steward, and extracts human-readable license text from the OSI HTML pages. Includes an optional transparent caching layer that auto-detects your registered `IDistributedCache` or `IMemoryCache`, with a `ConcurrentDictionary`-based fallback requiring zero configuration.
 
-## Features
+---
 
-* **Streaming API**: Support for `IAsyncEnumerable` to stream licenses, reducing memory usage when processing the full
-  catalog.
-* **License Text Extraction**: Automatically fetches and extracts clean, human-readable plain text from official OSI
-  license HTML pages.
-* **Extensible Caching**: Flexible caching layer supporting `IMemoryCache`, `IDistributedCache`, or a thread-safe
-  in-memory fallback.
-* **Comprehensive Filtering**: Query licenses by name, keyword, steward, or SPDX identifier (supporting wildcard
-  patterns).
-* **Strongly Typed**: Full mapping of OSI license metadata and classification keywords.
-* **Resilient**: Designed for modern .NET with async-first patterns and minimal allocations.
+## Quick start
 
-## Installation
-
-Install via NuGet:
-
-```bash
-dotnet add package OpenSourceInitiative.LicenseApi
-```
-
-Targets: `net10.0`, `netstandard2.0`
-
-## Quickstart
-
-### 1. Direct Usage (No Dependency Injection)
+### DI registration (recommended)
 
 ```csharp
-using OpenSourceInitiative.LicenseApi.Clients;
+// Minimal — caching on by default, fallback in-memory cache
+services.AddOsiLicensesClient();
 
-// Create a client instance
-using var client = new OsiClient();
+// With options
+services.AddOsiLicensesClient(options =>
+{
+    options.EnableCaching = true;                        // default: true
+    options.BaseAddress   = new Uri("https://...");      // default: OSI API
+});
+
+// With distributed cache — AutoDetectCache picks it up automatically
+services.AddStackExchangeRedisCache(...);
+services.AddOsiLicensesClient();
+```
+
+Resolve `IOsiClient` from the container:
+
+```csharp
+var client = sp.GetRequiredService<IOsiClient>();
 
 // Stream all licenses
 await foreach (var license in client.GetAllLicensesAsyncEnumerable())
-{
-    Console.WriteLine($"{license.SpdxId}: {license.Name}");
-}
+    Console.WriteLine(license?.Name);
 
-// Search by SPDX ID (supports wildcards)
-var gplLicenses = await client.GetBySpdxIdAsync("GPL*");
+// Filter
+var gplFamily = await client.GetBySpdxIdAsync("GPL*");
+var popular   = await client.GetByKeywordAsync(OsiLicenseKeyword.PopularStrongCommunity);
 ```
 
-### 2. Dependency Injection
+### Standalone (no DI)
 
 ```csharp
-using Microsoft.Extensions.DependencyInjection;
-using OpenSourceInitiative.LicenseApi.Extensions;
-using OpenSourceInitiative.LicenseApi.Interfaces;
-
-var services = new ServiceCollection();
-
-// Register the OSI client with caching enabled
-services.AddOsiLicensesClient(options =>
-{
-    options.EnableCaching = true;
-});
-
-var provider = services.BuildServiceProvider();
-var client = provider.GetRequiredService<IOsiClient>();
-
-// Get a license by its OSI identifier
+await using var client = new OsiClient();
 var mit = await client.GetByOsiIdAsync("mit");
+Console.WriteLine(mit?.LicenseText);
 ```
 
-## API Reference
+---
+
+## Public API surface
 
 ### `IOsiClient`
 
-The primary interface for interacting with the OSI API.
+The primary interface for all license queries. Lives at `OpenSourceInitiative.LicenseApi.Interfaces`.
 
-* `IAsyncEnumerable<OsiLicense?> GetAllLicensesAsyncEnumerable()`: Streams all registered licenses.
-* `Task<OsiLicense?> GetByOsiIdAsync(string id)`: Retrieves a single license by its OSI ID (e.g., `mit`).
-* `Task<IEnumerable<OsiLicense?>> GetBySpdxIdAsync(string id)`: Filters by SPDX ID. Supports `*` wildcards.
-* `Task<IEnumerable<OsiLicense?>> GetByNameAsync(string name)`: Filters by name or partial name match.
-* `Task<IEnumerable<OsiLicense?>> GetByKeywordAsync(OsiLicenseKeyword keyword)`: Filters by OSI classification keyword.
-* `Task<IEnumerable<OsiLicense?>> GetByStewardAsync(string steward)`: Filters by the organization responsible for the
-  license.
+| Method                                 | Description                                                       |
+|----------------------------------------|-------------------------------------------------------------------|
+| `GetAllLicensesAsyncEnumerable(token)` | Streams the full catalog as `IAsyncEnumerable<OsiLicense?>`.      |
+| `GetByOsiIdAsync(id, token)`           | Fetches a single license by its OSI ID (e.g. `"mit"`).            |
+| `GetBySpdxIdAsync(id, token)`          | Filters by SPDX ID; supports `*` wildcards (`"GPL*"`, `"*-2.0"`). |
+| `GetByNameAsync(name, token)`          | Filters by human-readable name.                                   |
+| `GetByKeywordAsync(keyword, token)`    | Filters by `OsiLicenseKeyword` enum value.                        |
+| `GetByStewardAsync(steward, token)`    | Filters by steward organization slug.                             |
 
-### Caching
+Implements `IDisposable` and `IAsyncDisposable`.
 
-Caching is enabled by default when using Dependency Injection. The library automatically detects and uses:
+---
 
-1. `IDistributedCache` (if registered)
-2. `IMemoryCache` (if registered)
-3. Internal thread-safe `ConcurrentDictionary` (fallback)
+### `OsiClient`
 
-## Models
+`public sealed class` — the concrete HTTP implementation of `IOsiClient`. Registered as a typed `IHttpClientFactory` client named `"OsiClient"` when using DI.
+
+Constructor: `OsiClient(ILogger<OsiClient>? logger, OsiClientOptions? options, HttpClient? httpClient)` — all parameters optional. When `httpClient` is `null`, the client owns and disposes the inner `HttpClient`; when provided externally it is not disposed.
+
+License text is fetched automatically per license via a three-step strategy:
+1. Steward `.txt` URL (authoritative plain text, no parsing).
+2. OSI HTML page — extracts the node with CSS class `license-content`.
+3. Steward HTML URL — last resort HTML extraction.
+
+---
+
+### `OsiClientOptions`
+
+`public sealed class` — configures the DI registration. Lives at `OpenSourceInitiative.LicenseApi.Options`.
+
+| Property                | Type                            | Default                       | Description                                            |
+|-------------------------|---------------------------------|-------------------------------|--------------------------------------------------------|
+| `BaseAddress`           | `Uri`                           | `https://opensource.org/api/` | OSI API base URL.                                      |
+| `EnableCaching`         | `bool`                          | `true`                        | Wraps the registered client with `OsiCachingClient`.   |
+| `PrimaryHandlerFactory` | `Func<HttpMessageHandler>?`     | `null`                        | Injects a custom primary handler (useful for testing). |
+| `UserAgent`             | `IList<ProductInfoHeaderValue>` | Assembly name + version       | Added to every request.                                |
+| `HttpClientHandler`     | `HttpClientHandler`             | `AllowAutoRedirect = true`    | Used when no external `HttpClient` is supplied.        |
+
+---
 
 ### `OsiLicense`
 
-Key properties include:
+`public sealed record` — represents one OSI license entry. Lives at `OpenSourceInitiative.LicenseApi.Models`.
 
-* `Id`: Unique OSI identifier.
-* `Name`: Full human-readable name.
-* `SpdxId`: Standard SPDX identifier.
-* `LicenseText`: Plain text content extracted from the license HTML page.
-* `Keywords`: Collection of `OsiLicenseKeyword` classification tokens.
-* `Approved`: Boolean indicating OSI approval status.
-* `Links`: Metadata links to the API and official HTML representation.
+| Property         | Type                                     | Notes                                                                       |
+|------------------|------------------------------------------|-----------------------------------------------------------------------------|
+| `Id`             | `string`                                 | OSI-internal identifier (e.g. `"mit"`).                                     |
+| `Name`           | `string`                                 | Human-readable name.                                                        |
+| `SpdxId`         | `string?`                                | SPDX identifier (e.g. `"MIT"`).                                             |
+| `Version`        | `string?`                                | Optional version string.                                                    |
+| `SubmissionDate` | `DateTime?`                              | Parsed from `yyyyMMdd` via `CustomFormatDateTimeConverter`.                 |
+| `ApprovalDate`   | `DateTime?`                              | Parsed from `yyyyMMdd`.                                                     |
+| `Approved`       | `bool`                                   | OSI approval status.                                                        |
+| `Keywords`       | `IReadOnlyCollection<OsiLicenseKeyword>` | Deserialized via `OsiLicenseKeywordsConverter`; unknown tokens are ignored. |
+| `Stewards`       | `IReadOnlyCollection<string>`            | Steward organization slugs.                                                 |
+| `Links`          | `OsiLicenseLinks`                        | HAL-style `_links` object.                                                  |
+| `LicenseText`    | `string`                                 | Extracted plain text — not part of the API payload (`[JsonIgnore]`).        |
 
-## Build and Test
+---
 
-* **Build**: `dotnet build -c Release`
-* **Test**: `dotnet test -c Release` (Requires coverage ≥ 75%)
+### `OsiLicenseKeyword`
 
-## Contributing
+`public enum` — OSI classification keywords. Lives at `OpenSourceInitiative.LicenseApi.Enums`.
 
-Issues and pull requests are welcome. Please ensure:
+Values: `PopularStrongCommunity`, `International`, `SpecialPurpose`, `NonReusable`, `Superseded`, `VoluntarilyRetired`, `RedundantWithMorePopular`, `OtherMiscellaneous`, `Uncategorized`.
 
-* Code style remains consistent.
-* New features are covered by tests.
-* Branching follows [GitFlow](https://nvie.com/posts/a-successful-git-branching-model/).
-* Contributors are added to the list below.
+Serializes to/from the OSI API string tokens (e.g. `popular-strong-community`) via `OsiLicenseKeywordsConverter`.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for more details.
+---
 
-## License
+### `ServiceCollectionExtensions`
 
-MIT — see [LICENSE](LICENSE).
+`public static class` — the single registration entry point. Lives at `OpenSourceInitiative.LicenseApi.Extensions`.
 
-## Acknowledgements
+`AddOsiLicensesClient(this IServiceCollection, Action<OsiClientOptions>?)` — registers:
+- A named `IHttpClientFactory` client (`"OsiClient"`).
+- `IOsiClient` → `OsiClient` (non-caching, registered as a keyed singleton `"OsiNonCachingClient"` when caching is on, or as a transient when off).
+- When `EnableCaching = true`: `ILicenseCache` → `AutoDetectCache` (via `TryAddSingleton`) and `IOsiClient` → `OsiCachingClient` (singleton).
 
-Data is provided by the [Open Source Initiative (OSI) License API](https://opensource.org/api/).
+---
 
-## Contributors
+### `OsiException` / `OsiInitializationException`
 
-* Oliver Schantz ([frequency403](https://github.com/frequency403))
+`public abstract/sealed class` — base and derived exception types. Live at `OpenSourceInitiative.LicenseApi.Exceptions`.
+
+`OsiInitializationException` is thrown by `OsiLicensesClient.InitializeAsync` when the catalog fetch fails.
+
+---
+
+### `CustomFormatDateTimeConverter`
+
+`public class JsonConverter<DateTime?>` — handles the `yyyyMMdd` date format used by the OSI API for submission and approval dates. Registered via `[JsonConverter]` attributes on `OsiLicense`. Null and empty strings deserialize to `null`; an unrecognized format throws `JsonException`.
+
+---
+
+### `IOsiLicensesClient` / `OsiLicensesClient` *(deprecated)*
+
+`[Obsolete]` — wraps `IOsiClient` with an eager-loading, snapshot-based API for backward compatibility. Use `IOsiClient` directly for new code.
+
+---
+
+## Internal architecture
+
+| Type                       | Visibility        | Role                                                                                                                                                                                               |
+|----------------------------|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `OsiCachingClient`         | `internal sealed` | Decorator over `IOsiClient` — intercepts all queries, checks cache before delegating.                                                                                                              |
+| `ILicenseCache`            | `internal`        | Uniform async cache contract: `GetAsync<T>`, `SetAsync<T>`, `RemoveAsync`.                                                                                                                         |
+| `AutoDetectCache`          | `internal sealed` | Selects the appropriate `ILicenseCache` implementation at construction: `IDistributedCache` → `DistributedCacheAdapter`; `IMemoryCache` → `MemoryCacheAdapter`; neither → `InMemoryCacheFallback`. |
+| `DistributedCacheAdapter`  | `internal`        | Adapts `IDistributedCache` to `ILicenseCache` using `System.Text.Json` serialization.                                                                                                              |
+| `MemoryCacheAdapter`       | `internal`        | Adapts `IMemoryCache` to `ILicenseCache`.                                                                                                                                                          |
+| `InMemoryCacheFallback`    | `internal`        | Thread-safe `ConcurrentDictionary`-based cache with optional TTL expiry.                                                                                                                           |
+| `HttpClientExtensions`     | `internal static` | `GetLicenseTextAsync`, `TryFetchPlainTextAsync`, `TryFetchHtmlLicenseTextAsync`, `ConfigureForLicenseApi`.                                                                                         |
+| `OsiLicenseKeywordMapping` | `internal static` | Bidirectional map between `OsiLicenseKeyword` enum values and API string tokens.                                                                                                                   |
+
+---
+
+## Cache selection matrix
+
+```
+IDistributedCache registered?  ──Yes──▶  DistributedCacheAdapter
+        │ No
+        ▼
+IMemoryCache registered?  ──Yes──▶  MemoryCacheAdapter
+        │ No
+        ▼
+InMemoryCacheFallback  (zero-config, process-local)
+```
+
+The selection is performed once at `AutoDetectCache` construction — no runtime switching. `TryAddSingleton` ensures consumer-registered `ILicenseCache` implementations take precedence.
+
+---
+
+## Target frameworks
+
+| TFM              | Notes                                                                                                                           |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `net10.0`        | Full feature set. Uses `ValueTask.CompletedTask`, `MediaTypeNames`, `ReadAsStreamAsync(token)`, C# 14 extension blocks.         |
+| `netstandard2.0` | Compatible subset. `#if !NETSTANDARD2_0` guards cover API surface differences. `System.Text.Json` pulled as a NuGet dependency. |

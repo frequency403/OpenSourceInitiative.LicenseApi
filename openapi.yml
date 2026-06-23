@@ -1,0 +1,541 @@
+openapi: 3.2.0
+
+info:
+  title: OpenSource Licenses API
+  summary: Public API providing access to OSI license information.
+  description: |
+    Specification for the Open Source Initiative (OSI) License API at `https://opensource.org/api`.
+
+    Reconstructed via crawling and cross-referenced against:
+    - Official announcement: https://opensource.org/blog/introducing-the-new-api-for-osi-approved-licenses
+    - Official developer documentation by Glynn Quelch (Automattic):
+      https://discuss.opensource.org/t/introducing-the-new-api-for-osi-approved-licenses/1169
+
+    ## Behavioral Notes
+
+    **`/license` and `/licenses`** are functionally identical — all query parameters work on either path.
+
+    **All query parameters are optional and freely combinable (AND logic).**
+
+    **`name`** — case-insensitive substring match against the `name` field. Behaves implicitly as `*{name}*`.
+
+    **`spdx`** — case-insensitive match against `spdx_id`. Supports `*` as a wildcard:
+    `gpl*` (prefix), `*bsd` (suffix), `*apache*` (substring), `GPL-3.0` (exact).
+    Entries with an empty `spdx_id` are excluded from wildcard queries.
+
+    **`keyword`** and **`steward`** — can be specified multiple times (AND logic).
+    Unknown `keyword` values return HTTP 200 with an empty array.
+
+    **`approved`** — accepted without error but has no filter effect. Both values return all
+    122 entries. Not mentioned in the official developer documentation.
+
+    **`GET /license/{id}` with unknown ID** — returns HTTP **200** with
+    `{"error": "License not found."}`, not HTTP 404.
+
+    **Caching** — `Cache-Control: max-age=300, must-revalidate`.
+  version: 1.2.0
+  license:
+    name: CC0 1.0
+    identifier: CC0-1.0
+
+servers:
+  - url: https://opensource.org/api
+    name: production
+    description: Production endpoint
+
+tags:
+  - name: License
+    summary: OSI license queries
+    description: Operations for querying and filtering OSI approved licenses.
+
+externalDocs:
+  description: Official OSI API announcement
+  url: https://opensource.org/blog/introducing-the-new-api-for-osi-approved-licenses
+
+paths:
+
+  /licenses:
+    get:
+      tags: [License]
+      summary: Get and filter licenses
+      description: |
+        Returns all public/published licenses. All query parameters are optional
+        and can be freely combined. Functionally identical to `GET /license`.
+      operationId: GetLicenses
+      parameters:
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Spdx'
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/Steward'
+        - $ref: '#/components/parameters/Approved'
+      responses:
+        '200':
+          $ref: '#/components/responses/LicenseList'
+
+  /license:
+    get:
+      tags: [License]
+      summary: Get and filter licenses (alias)
+      description: |
+        Functionally identical to `GET /licenses`. All query parameters are optional
+        and can be freely combined.
+      operationId: GetLicensesAlias
+      parameters:
+        - $ref: '#/components/parameters/Name'
+        - $ref: '#/components/parameters/Spdx'
+        - $ref: '#/components/parameters/Keyword'
+        - $ref: '#/components/parameters/Steward'
+        - $ref: '#/components/parameters/Approved'
+      responses:
+        '200':
+          $ref: '#/components/responses/LicenseList'
+
+  /license/{id}:
+    get:
+      tags: [License]
+      summary: Get license by OSI slug
+      description: |
+        Returns a single license by its OSI slug.
+
+        **Slug format:** lowercase, dots replaced with hyphens
+        (e.g. `gpl-3-0`, `apache-2-0`, `mit`, `cddl-1-1`). Case-insensitive.
+
+        **Error behavior:** unknown IDs return HTTP 200 with
+        `{"error": "License not found."}` — not HTTP 404.
+        Clients must check for the presence of the `error` field.
+      operationId: GetLicenseById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: OSI-internal slug from the `id` field in list responses.
+          schema:
+            type: string
+          examples:
+            mit:
+              summary: MIT License
+              dataValue: mit
+            apache:
+              summary: Apache License 2.0
+              dataValue: apache-2-0
+            gpl3:
+              summary: GNU GPL version 3
+              dataValue: gpl-3-0
+            cddl11:
+              summary: CDDL 1.1 — one of the three currently approved=true entries
+              dataValue: cddl-1-1
+      responses:
+        '200':
+          description: |
+            License object **or** error body when the ID is unknown.
+            HTTP status is 200 in both cases — check for the `error` field.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/License'
+                  - $ref: '#/components/schemas/LicenseNotFoundError'
+              examples:
+                found:
+                  summary: License found — cddl-1-1 (approved=true)
+                  dataValue:
+                    id: cddl-1-1
+                    name: COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL)
+                    spdx_id: CDDL-1.1
+                    version: "1.1"
+                    submission_date: "20250502"
+                    submission_url: "https://lists.opensource.org/pipermail/license-review_lists.opensource.org/2025-May/005756.html"
+                    submitter_name: Brian Warner
+                    approved: true
+                    approval_date: "20250718"
+                    license_steward_version: ""
+                    license_steward_url: "https://javaee.github.io/glassfish/LICENSE"
+                    board_minutes: "https://opensource.org/meeting-minutes/2025-07-18"
+                    stewards: [oracle]
+                    keywords: [uncategorized]
+                    _links:
+                      self:
+                        href: https://opensource.org/api/license/cddl-1-1
+                      html:
+                        href: https://opensource.org/license/cddl-1-1
+                      collection:
+                        href: https://opensource.org/api/licenses
+                notFound:
+                  summary: Unknown ID
+                  dataValue:
+                    error: "License not found."
+        '404':
+          description: |
+            WordPress REST router error for unregistered paths.
+            Occurs on structurally invalid routes (e.g. the legacy `/api/license/SPDX/Apache-2.0`),
+            not on unknown license IDs (which return HTTP 200 — see above).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WordPressRestError'
+
+components:
+
+  parameters:
+
+    Name:
+      name: name
+      in: query
+      required: false
+      description: |
+        Case-insensitive substring match against the `name` field.
+        Behaves implicitly as `*{name}*` — no wildcard syntax needed or supported.
+      schema:
+        type: string
+      examples:
+        gpl:
+          summary: All licenses with "gpl" in the name
+          dataValue: gpl
+        apache:
+          summary: All licenses with "apache" in the name
+          dataValue: apache
+
+    Spdx:
+      name: spdx
+      in: query
+      required: false
+      description: |
+        Case-insensitive match against the `spdx_id` field. Supports `*` as a wildcard.
+
+        - No wildcard → exact match (`GPL-3.0`)
+        - `prefix*` → starts-with (`gpl*`)
+        - `*suffix` → ends-with (`*bsd`)
+        - `*contains*` → substring (`*apache*`)
+
+        Entries with an empty `spdx_id` are excluded from wildcard queries.
+      schema:
+        type: string
+      examples:
+        exact:
+          summary: Exact match
+          dataValue: GPL-3.0
+        prefix:
+          summary: Prefix wildcard — all GPL variants
+          dataValue: gpl*
+        suffix:
+          summary: Suffix wildcard — licenses ending in "bsd"
+          dataValue: "*bsd"
+        contains:
+          summary: Substring wildcard — all Apache variants
+          dataValue: "*apache*"
+
+    Keyword:
+      name: keyword
+      in: query
+      required: false
+      description: |
+        Filter by keyword tag. Can be specified multiple times (AND logic).
+        Unknown values return HTTP 200 with an empty array.
+      schema:
+        type: string
+        enum:
+          - popular-strong-community
+          - international
+          - special-purpose
+          - non-reusable
+          - superseded
+          - voluntarily-retired
+          - redundant-with-more-popular
+          - other-miscellaneous
+          - uncategorized
+      examples:
+        popular:
+          summary: Widely-used licenses
+          dataValue: popular-strong-community
+        superseded:
+          summary: Licenses superseded by a newer version
+          dataValue: superseded
+
+    Steward:
+      name: steward
+      in: query
+      required: false
+      description: |
+        Filter by steward organization slug. Can be specified multiple times (AND logic).
+      schema:
+        type: string
+        enum:
+          - apache-software-foundation
+          - apple
+          - berkley-software-design-inc
+          - boost
+          - cea-cnrs-inria-logiciel-libre
+          - cern
+          - cua-office
+          - eclipse-foundation
+          - european-commission
+          - free-software-foundation
+          - government-of-quebec
+          - ibm
+          - ietf
+          - jabber-foundation
+          - jam-software
+          - microsoft
+          - miros-bsd
+          - mozilla-foundation
+          - nasa
+          - open-logistics-foundation
+          - open-mpi
+          - oracle
+          - oset
+          - python-software-foundation
+          - sil-international
+          - socialtext
+          - sun-microsystems
+          - the-information-technology-promotion-agency
+          - the-non-profit-international-consortium-for-eiffel-nice
+          - the-openldap-project
+          - the-perl-raku-foundation
+          - trolltech-as
+          - unicode-consortium
+          - university-of-victoria
+          - zlib
+          - zope-foundation
+      examples:
+        fsf:
+          summary: Free Software Foundation
+          dataValue: free-software-foundation
+        eclipse:
+          summary: Eclipse Foundation
+          dataValue: eclipse-foundation
+
+    Approved:
+      name: approved
+      in: query
+      required: false
+      deprecated: true
+      description: |
+        Accepted without error but has **no filter effect** — both values return all 122 entries.
+        Not mentioned in the official developer documentation.
+        The `approved` field on the license object is correctly populated
+        and can be used for client-side filtering.
+
+        As of June 2026, 3 of 122 entries have `approved: true`:
+        `cddl-1-1`, `wordnet`, `bsd-3-clause-open-mpi`.
+      schema:
+        type: boolean
+
+  responses:
+
+    LicenseList:
+      description: |
+        Array of license objects.
+        Returns an empty array `[]` when no entries match the filter criteria.
+      headers:
+        Cache-Control:
+          description: Server-side cache directive.
+          schema:
+            type: string
+            examples:
+              - max-age=300, must-revalidate
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/License'
+          examples:
+            mit:
+              summary: MIT License entry
+              dataValue:
+                - id: mit
+                  name: The MIT License
+                  spdx_id: MIT
+                  version: "N/A"
+                  submission_date: ""
+                  submission_url: ""
+                  submitter_name: ""
+                  approved: false
+                  approval_date: ""
+                  license_steward_version: ""
+                  license_steward_url: ""
+                  board_minutes: ""
+                  stewards: []
+                  keywords: [popular-strong-community]
+                  _links:
+                    self:
+                      href: https://opensource.org/api/license/mit
+                    html:
+                      href: https://opensource.org/license/mit
+                    collection:
+                      href: https://opensource.org/api/licenses
+
+  schemas:
+
+    License:
+      type: object
+      description: |
+        Full license object. All string fields may contain empty strings
+        when the information is unknown or not applicable.
+      required:
+        - id
+        - name
+        - spdx_id
+        - version
+        - submission_date
+        - submission_url
+        - submitter_name
+        - approved
+        - approval_date
+        - license_steward_version
+        - license_steward_url
+        - board_minutes
+        - stewards
+        - keywords
+        - _links
+      properties:
+        id:
+          type: string
+          description: |
+            OSI-internal slug. Lowercase, dots replaced with hyphens.
+            Used as the `{id}` path segment in `GET /license/{id}`.
+          examples:
+            - apache-2-0
+        name:
+          type: string
+          description: Full license name.
+          examples:
+            - Apache License, Version 2.0
+        spdx_id:
+          type: string
+          description: SPDX identifier. Empty string if none has been assigned.
+          examples:
+            - Apache-2.0
+        version:
+          type: string
+          description: Version string. `"N/A"` if not applicable, empty string if unknown.
+          examples:
+            - "2.0"
+            - "N/A"
+        submission_date:
+          type: string
+          description: Submission date in `YYYYMMDD` format. Empty string if unknown.
+          examples:
+            - "20040208"
+        submission_url:
+          type: string
+          description: |
+            URL to the original submission email on `lists.opensource.org`.
+            Empty string if unknown. Not validated as a URI — some raw entries
+            contain leading whitespace.
+          examples:
+            - "https://lists.opensource.org/pipermail/license-discuss_lists.opensource.org/2004-February/007654.html"
+        submitter_name:
+          type: string
+          description: Name of the submitter. Empty string if unknown.
+          examples:
+            - Kevin Coar
+        approved:
+          type: boolean
+          description: |
+            `true` if OSI-approved. As of June 2026, only 3 of 122 entries are `true`:
+            `cddl-1-1`, `wordnet`, `bsd-3-clause-open-mpi`.
+
+            The `?approved` query parameter has no filter effect — see parameter docs.
+        approval_date:
+          type: string
+          description: Approval date in `YYYYMMDD` format. Empty string if not yet approved.
+          examples:
+            - "20250718"
+        license_steward_version:
+          type: string
+          description: Version maintained by the steward. Empty string in nearly all entries.
+        license_steward_url:
+          type: string
+          description: URL to the steward's canonical license text. Empty string if unavailable.
+          examples:
+            - "https://www.apache.org/licenses/LICENSE-2.0"
+        board_minutes:
+          type: string
+          description: |
+            URL to the OSI board meeting minutes. Empty string if unavailable.
+            Older entries may reference `wiki.opensource.org`.
+          examples:
+            - "https://opensource.org/meeting-minutes/2025-07-18"
+        stewards:
+          type: array
+          description: Steward organization slugs. Empty array if none known.
+          items:
+            type: string
+          examples:
+            - [apache-software-foundation]
+            - []
+        keywords:
+          type: array
+          description: |
+            Classification tags. Retirement and withdrawal status is expressed via
+            `superseded` and `voluntarily-retired` — no separate boolean field exists.
+
+            Known values: `international`, `non-reusable`, `other-miscellaneous`,
+            `popular-strong-community`, `redundant-with-more-popular`, `special-purpose`,
+            `superseded`, `uncategorized`, `voluntarily-retired`.
+          items:
+            type: string
+          examples:
+            - [popular-strong-community]
+        _links:
+          $ref: '#/components/schemas/Links'
+
+    Links:
+      type: object
+      description: HAL-style hypermedia links (HATEOAS).
+      required: [self, html, collection]
+      properties:
+        self:
+          $ref: '#/components/schemas/Link'
+        html:
+          $ref: '#/components/schemas/Link'
+        collection:
+          $ref: '#/components/schemas/Link'
+
+    Link:
+      type: object
+      required: [href]
+      properties:
+        href:
+          type: string
+          format: uri
+          examples:
+            - https://opensource.org/api/license/mit
+
+    LicenseNotFoundError:
+      type: object
+      description: |
+        Returned when the requested `{id}` does not exist.
+        HTTP status is **200**, not 404.
+        Clients must check for the presence of the `error` field.
+      required: [error]
+      properties:
+        error:
+          type: string
+          examples:
+            - "License not found."
+
+    WordPressRestError:
+      type: object
+      description: |
+        WordPress REST router error returned with HTTP 404 for unregistered paths.
+        Distinct from `LicenseNotFoundError` — this occurs for structurally invalid
+        routes, not for valid routes with unknown IDs.
+      required: [code, message, data]
+      properties:
+        code:
+          type: string
+          examples:
+            - rest_no_route
+        message:
+          type: string
+          examples:
+            - No route was found matching the URL and request method.
+        data:
+          type: object
+          properties:
+            status:
+              type: integer
+              examples:
+                - 404

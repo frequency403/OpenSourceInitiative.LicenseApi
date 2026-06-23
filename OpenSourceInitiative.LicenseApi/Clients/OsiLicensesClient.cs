@@ -34,7 +34,7 @@ public sealed class OsiLicensesClient : IOsiLicensesClient
     /// <summary>
     ///     Read-only, fail-safe view of the last loaded licenses snapshot.
     /// </summary>
-    public IReadOnlyList<OsiLicense> Licenses { get; private set; } = Array.Empty<OsiLicense>();
+    public IReadOnlyList<OsiLicense> Licenses { get; private set; } = [];
 
     /// <inheritdoc />
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
@@ -98,13 +98,13 @@ public sealed class OsiLicensesClient : IOsiLicensesClient
     public async Task<IReadOnlyList<OsiLicense>> SearchAsync(string query,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(query)) return Array.Empty<OsiLicense>();
+        if (string.IsNullOrWhiteSpace(query)) return [];
 
         await InitializeAsync(cancellationToken);
         var q = query.Trim();
         return Licenses.Where(l =>
-                l.Name?.Contains(q, StringComparison.OrdinalIgnoreCase) == true ||
-                l.Id?.Contains(q, StringComparison.OrdinalIgnoreCase) == true)
+                l.Name.Contains(q, StringComparison.OrdinalIgnoreCase)||
+                l.Id.Contains(q, StringComparison.OrdinalIgnoreCase))
             .ToList();
     }
 
@@ -118,7 +118,7 @@ public sealed class OsiLicensesClient : IOsiLicensesClient
     public async Task<OsiLicense?> GetBySpdxAsync(string spdxId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(spdxId)) return null;
-        var results = await _osiClient.GetBySpdxIdAsync(spdxId);
+        var results = await _osiClient.GetBySpdxIdAsync(spdxId, cancellationToken);
         return results.FirstOrDefault();
     }
 
@@ -132,17 +132,17 @@ public sealed class OsiLicensesClient : IOsiLicensesClient
     public async Task<IReadOnlyList<OsiLicense>> GetLicensesByNameAsync(string name,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(name)) return Array.Empty<OsiLicense>();
-        return (await _osiClient.GetByNameAsync(name)).Where(x => x != null).Cast<OsiLicense>().ToList();
+        if (string.IsNullOrWhiteSpace(name)) return [];
+        return (await _osiClient.GetByNameAsync(name, cancellationToken)).Where(x => x != null).Cast<OsiLicense>().ToList();
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<OsiLicense>> GetLicensesByKeywordAsync(string keyword,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(keyword)) return Array.Empty<OsiLicense>();
-        if (!OsiLicenseKeywordMapping.TryParse(keyword, out var value)) return Array.Empty<OsiLicense>();
-        return (await _osiClient.GetByKeywordAsync(value)).Where(x => x != null).Cast<OsiLicense>().ToList();
+        if (string.IsNullOrWhiteSpace(keyword)) return [];
+        if (!OsiLicenseKeywordMapping.TryParse(keyword, out var value)) return [];
+        return (await _osiClient.GetByKeywordAsync(value, cancellationToken)).Where(x => x != null).Cast<OsiLicense>().ToList();
     }
 
     /// <inheritdoc />
@@ -156,16 +156,16 @@ public sealed class OsiLicensesClient : IOsiLicensesClient
     public async Task<IReadOnlyList<OsiLicense>> GetLicensesByStewardAsync(string steward,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steward)) return Array.Empty<OsiLicense>();
-        return (await _osiClient.GetByStewardAsync(steward)).Where(x => x != null).Cast<OsiLicense>().ToList();
+        if (string.IsNullOrWhiteSpace(steward)) return [];
+        return (await _osiClient.GetByStewardAsync(steward, cancellationToken)).Where(x => x != null).Cast<OsiLicense>().ToList();
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<OsiLicense>> GetLicensesBySpdxPatternAsync(string spdxPattern,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(spdxPattern)) return Array.Empty<OsiLicense>();
-        return (await _osiClient.GetBySpdxIdAsync(spdxPattern)).Where(x => x != null).Cast<OsiLicense>().ToList();
+        if (string.IsNullOrWhiteSpace(spdxPattern)) return [];
+        return (await _osiClient.GetBySpdxIdAsync(spdxPattern, cancellationToken)).Where(x => x != null).Cast<OsiLicense>().ToList();
     }
 
     // Synchronous wrappers
@@ -198,9 +198,14 @@ public sealed class OsiLicensesClient : IOsiLicensesClient
     {
         _initGate.Dispose();
     }
-
-    public async ValueTask DisposeAsync()
+    
+    public ValueTask DisposeAsync()
     {
         _initGate.Dispose();
+#if !NETSTANDARD2_0
+        return ValueTask.CompletedTask;
+#else
+        return new ValueTask();
+#endif
     }
 }

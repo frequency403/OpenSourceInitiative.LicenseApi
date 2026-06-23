@@ -25,21 +25,12 @@ internal sealed class AutoDetectCache : ILicenseCache
 
     public AutoDetectCache(IServiceProvider sp)
     {
-        var distributed = sp.GetService<IDistributedCache>();
-        if (distributed != null)
+        _inner = (sp.GetService<IDistributedCache>(), sp.GetService<IMemoryCache>()) switch
         {
-            _inner = new DistributedCacheAdapter(distributed);
-            return;
-        }
-
-        var memory = sp.GetService<IMemoryCache>();
-        if (memory != null)
-        {
-            _inner = new MemoryCacheAdapter(memory);
-            return;
-        }
-
-        _inner = new InMemoryCacheFallback();
+            ({ } distributed, _) => new DistributedCacheAdapter(distributed),
+            (_, { } memory)      => new MemoryCacheAdapter(memory),
+            _                    => new InMemoryCacheFallback()
+        };
     }
 
     /// <inheritdoc />
