@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Create & push tag
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
