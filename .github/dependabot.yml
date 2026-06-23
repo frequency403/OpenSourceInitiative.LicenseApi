@@ -33,4 +33,3 @@ updates:
 
     commit-message:
       prefix: "chore(deps)"
-      signoff: true
