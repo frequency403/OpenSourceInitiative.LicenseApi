@@ -7,7 +7,7 @@ namespace OpenSourceInitiative.LicenseApi.Models;
 /// <summary>
 ///     Represents a single OSI license entry as returned by the OSI License API.
 /// </summary>
-public sealed record OsiLicense
+public sealed record OsiLicense : IJsonOnSerializing
 {
     /// <summary>
     ///     OSI Unique identifier for the license
@@ -108,12 +108,17 @@ public sealed record OsiLicense
     /// <summary>
     ///     Extracted, human-readable license text from the license HTML page.
     /// </summary>
-    [JsonIgnore]
-    public string LicenseText { get; internal set; } = string.Empty;
+    public string? LicenseText { get; set; } = string.Empty;
 
     /// <inheritdoc />
     public override string ToString()
     {
         return Name;
+    }
+
+    void IJsonOnSerializing.OnSerializing()
+    {
+        if (string.IsNullOrEmpty(LicenseText))
+            throw new InvalidOperationException($"{nameof(LicenseText)} must be populated before serialization.");
     }
 }

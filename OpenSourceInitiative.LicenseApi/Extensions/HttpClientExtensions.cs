@@ -40,16 +40,7 @@ internal static class HttpClientExtensions
         {
             var stewardUrl = license.LicenseStewardUrl;
             var hasStewardUrl = !string.IsNullOrWhiteSpace(stewardUrl);
-
-            // Step 1: Steward .txt — authoritative source, no DOM parsing overhead
-            if (hasStewardUrl && stewardUrl!.EndsWith(".txt", StringComparison.OrdinalIgnoreCase))
-            {
-                var text = await client.TryFetchPlainTextAsync(stewardUrl, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(text))
-                    return text!;
-            }
-
-            // Step 2: OSI HTML page — consistent structure, known CSS class
+            
             var osiText = await client.TryFetchHtmlLicenseTextAsync(license.Links.Html.Href, cancellationToken);
             if (!string.IsNullOrWhiteSpace(osiText))
                 return osiText!;
@@ -63,33 +54,6 @@ internal static class HttpClientExtensions
             }
 
             return string.Empty;
-        }
-
-        /// <summary>
-        ///     Fetches the response body of the given URL as a plain-text string.
-        /// </summary>
-        /// <param name="url">The URL to fetch.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>The trimmed response body, or <see langword="null"/> if the request fails.</returns>
-        private async Task<string?> TryFetchPlainTextAsync(string url,
-            CancellationToken cancellationToken)
-        {
-            var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
-            
-            if (!response.IsSuccessStatusCode)
-                return null;
-            
-            var contentType = response.Content.Headers.ContentType?.MediaType;
-            if (!string.IsNullOrWhiteSpace(contentType) && contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
-                return null;
-
-#if !NETSTANDARD2_0
-            var text = await response.Content.ReadAsStringAsync(cancellationToken);
-#else
-    var text = await response.Content.ReadAsStringAsync();
-#endif
-            return text.Trim();
         }
 
         /// <summary>
