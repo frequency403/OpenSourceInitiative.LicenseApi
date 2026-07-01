@@ -52,4 +52,29 @@ public class OsiClientTests
         // Assert
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
+
+    [Theory]
+    [InlineData("http://evil.example.com/steal")]
+    [InlineData("//evil.example.com/steal")]
+    [InlineData("../../admin")]
+    public async Task GetByOsiIdAsync_Never_Escapes_Configured_Host(string maliciousId)
+    {
+        // Arrange
+        Uri? requestedUri = null;
+        var handler = new StubHttpMessageHandler(req =>
+        {
+            requestedUri = req.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        var http = new HttpClient(handler);
+        using var client = new OsiClient(httpClient: http);
+
+        // Act
+        var act = async () => await client.GetByOsiIdAsync(maliciousId, TestContext.Current.CancellationToken);
+
+        // Assert
+        await act.ShouldThrowAsync<HttpRequestException>();
+        requestedUri.ShouldNotBeNull();
+        requestedUri!.Host.ShouldBe("opensource.org");
+    }
 }

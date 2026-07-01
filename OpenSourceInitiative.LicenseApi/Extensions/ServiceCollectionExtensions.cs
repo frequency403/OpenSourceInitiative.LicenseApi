@@ -1,7 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging;
-using OpenSourceInitiative.LicenseApi.Caches;
 using OpenSourceInitiative.LicenseApi.Clients;
 using OpenSourceInitiative.LicenseApi.Interfaces;
 using OpenSourceInitiative.LicenseApi.Options;
@@ -38,35 +35,13 @@ public static class ServiceCollectionExtensions
         var options = new OsiClientOptions();
         configure?.Invoke(options);
 
-        // 1. Configure HttpClient for the underlying OsiClient
         var clientBuilder =
-            services.AddHttpClient(OsiClientName, client => { client.ConfigureForLicenseApi(options); });
+            services.AddHttpClient<OsiClient>(client => client.ConfigureForLicenseApi(options));
 
         if (options.PrimaryHandlerFactory is not null)
             clientBuilder.ConfigurePrimaryHttpMessageHandler(_ => options.PrimaryHandlerFactory());
 
-        // 2. Register the appropriate IOsiClient
-        if (options.EnableCaching)
-        {
-            services.AddKeyedSingleton<IOsiClient, OsiClient>(OsiClientNonCachingName, (sp, _) =>
-            {
-                var factory = sp.GetRequiredService<IHttpClientFactory>();
-                var httpClient = factory.CreateClient(OsiClientName);
-                return new OsiClient(sp.GetService<ILogger<OsiClient>>(), options, httpClient);
-            });
-            services.TryAddSingleton<ILicenseCache, AutoDetectCache>();
-
-            services.AddSingleton<IOsiClient, OsiCachingClient>();
-        }
-        else
-        {
-            services.AddTransient<IOsiClient, OsiClient>(sp =>
-            {
-                var factory = sp.GetRequiredService<IHttpClientFactory>();
-                var httpClient = factory.CreateClient(OsiClientName);
-                return new OsiClient(sp.GetService<ILogger<OsiClient>>(), options, httpClient);
-            });
-        }
+        services.AddTransient<IOsiClient, OsiClient>();
 
         return services;
     }

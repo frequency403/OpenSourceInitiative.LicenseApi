@@ -37,11 +37,6 @@ public sealed class OsiClientOptions
     public Func<HttpMessageHandler>? PrimaryHandlerFactory { get; set; }
 
     /// <summary>
-    ///     Specifies whether in-memory caching is enabled. Defaults to <c>true</c>.
-    /// </summary>
-    public bool EnableCaching { get; set; } = true;
-
-    /// <summary>
     ///     User-Agent header to use for all requests when using the prepared <see cref="HttpClient" /> by this library.
     /// </summary>
     public IList<ProductInfoHeaderValue> UserAgent { get; set; } = new List<ProductInfoHeaderValue>
