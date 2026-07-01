@@ -22,10 +22,7 @@ public class HttpClientExtensionsTests
         };
 
         // Act
-        var method =
-            typeof(HttpClientExtensions).GetMethod("GetLicenseTextAsync", BindingFlags.Static | BindingFlags.NonPublic);
-        var textTask = (Task<string>)method!.Invoke(null, [http, lic, CancellationToken.None])!;
-        var text = await textTask;
+        var text = await lic.GetLicenseText(http, TestContext.Current.CancellationToken);
 
         // Assert
         text.ShouldBe(expected);

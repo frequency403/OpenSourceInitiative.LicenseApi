@@ -12,7 +12,7 @@ var services = new ServiceCollection();
 services.AddLogging(b => b.AddConsole());
 
 // Register with caching enabled by default
-services.AddOsiLicensesClient(options => { options.EnableCaching = true; });
+services.AddOsiLicensesClient();
 
 await using var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<IOsiClient>();
@@ -30,19 +30,10 @@ Console.WriteLine($"Popular licenses via DI: {popular.Count}\n");
 // 2) Demonstrate different caching methods
 Console.WriteLine("2) Demonstrate different caching methods\n");
 
-// Example of registering without caching
 var servicesNoCache = new ServiceCollection();
-servicesNoCache.AddOsiLicensesClient(options => options.EnableCaching = false);
+servicesNoCache.AddOsiLicensesClient();
 await using var providerNoCache = servicesNoCache.BuildServiceProvider();
 var clientNoCache = providerNoCache.GetRequiredService<IOsiClient>();
-Console.WriteLine($"Client without caching: {clientNoCache.GetType().Name}\n");
-
-// Example of registering with memory cache
-var servicesMemoryCache = new ServiceCollection();
-servicesMemoryCache.AddMemoryCache(); // Required for MemoryCacheAdapter
-servicesMemoryCache.AddOsiLicensesClient(options => options.EnableCaching = true);
-await using var providerMemoryCache = servicesMemoryCache.BuildServiceProvider();
-var clientMemoryCache = providerMemoryCache.GetRequiredService<IOsiClient>();
-Console.WriteLine($"Client with memory caching: {clientMemoryCache.GetType().Name}\n");
+Console.WriteLine($"Client: {clientNoCache.GetType().Name}\n");
 
 Console.WriteLine("Example completed.\n");

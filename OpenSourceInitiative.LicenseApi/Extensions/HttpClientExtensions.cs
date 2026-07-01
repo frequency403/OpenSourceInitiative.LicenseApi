@@ -27,14 +27,11 @@ internal static class HttpClientExtensions
     extension(HttpClient client)
     {
         /// <summary>
-        ///     Downloads and extracts the human-readable license text using a prioritized source strategy.
-        ///     Priority: (1) <see cref="OsiLicense.LicenseStewardUrl"/> if plain-text (.txt) — authoritative,
-        ///     no parsing required. (2) <see cref="OsiLicenseLinks.Html"/> OSI page — reliable HTML fallback.
-        ///     (3) <see cref="OsiLicense.LicenseStewardUrl"/> as HTML — last resort if OSI page yields nothing.
+        /// Because the License API does not provide a license text, we need to fetch it ourselfes.
         /// </summary>
-        /// <param name="license">The license to fetch text for.</param>
-        /// <param name="cancellationToken">Cancellation token.</param>
-        /// <returns>The plain-text license content, or an empty string if all sources fail.</returns>
+        /// <param name="license"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         internal async Task<string> GetLicenseTextAsync(OsiLicense license,
             CancellationToken cancellationToken = default)
         {
