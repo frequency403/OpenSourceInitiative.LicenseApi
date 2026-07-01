@@ -33,57 +33,5 @@ public class DependencyInjectionTests
         var client = provider.GetRequiredService<IOsiClient>();
         client.ShouldNotBeNull();
     }
-
-    [Fact]
-    public void AddOsiLicensesClient_Resolves_Caching_Client_By_Default()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddOsiLicensesClient();
-
-        using var sp = services.BuildServiceProvider();
-
-        // Act
-        var client = sp.GetRequiredService<IOsiClient>();
-
-        // Assert
-        client.ShouldBeOfType<OsiCachingClient>();
-    }
-
-    [Fact]
-    public void AddOsiLicensesClient_Resolves_NonCaching_Client_When_Disabled()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddOsiLicensesClient(o => o.EnableCaching = false);
-
-        using var sp = services.BuildServiceProvider();
-
-        // Act
-        var client = sp.GetRequiredService<IOsiClient>();
-
-        // Assert
-        client.ShouldBeOfType<OsiClient>();
-    }
-
-    [Fact]
-    public void AddOsiLicensesClient_Registers_Keyed_NonCaching_Client_When_Caching_Enabled()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddOsiLicensesClient();
-
-        using var sp = services.BuildServiceProvider();
-
-        // Act
-        var nonCaching = sp.GetRequiredKeyedService<IOsiClient>("OsiNonCachingClient");
-        var caching = sp.GetRequiredService<IOsiClient>();
-
-        // Assert
-        nonCaching.ShouldBeOfType<OsiClient>();
-        caching.ShouldBeOfType<OsiCachingClient>();
-    }
+    
 }

@@ -91,7 +91,10 @@ public sealed class OsiClient : IOsiClient
     /// <inheritdoc />
     public async Task<OsiLicense?> GetByOsiIdAsync(string id, CancellationToken token = default)
     {
-        var uri = new Uri(_baseAddress, id);
+        // id must be escaped before combining with _baseAddress: Uri(baseUri, relativeUri) treats a
+        // relativeUri that parses as absolute (e.g. "http://evil.example/x") as a full override of the
+        // base, and un-escaped ".." segments as path traversal. Escaping keeps it a single path segment.
+        var uri = new Uri(_baseAddress, Uri.EscapeDataString(id));
         using var httpResponse = await _httpClient.GetAsync(uri, token);
         try
         {

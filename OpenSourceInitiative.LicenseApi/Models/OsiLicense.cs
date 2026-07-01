@@ -108,8 +108,7 @@ public sealed record OsiLicense
     /// <summary>
     ///     Extracted, human-readable license text from the license HTML page.
     /// </summary>
-    [JsonIgnore]
-    public string LicenseText { get; internal set; } = string.Empty;
+    public string? LicenseText { get; set; } = string.Empty;
 
     /// <inheritdoc />
     public override string ToString()
