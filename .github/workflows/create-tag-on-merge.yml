@@ -25,10 +25,10 @@ jobs:
         id: version
         with:
           file-name: Directory.Build.props
-
+      
       - name: Create tag
         uses: tvdias/github-tagger@v0.0.2
-        with:
+        with: 
           commit-sha: ${{ github.event.pull_request.merge_commit_sha }}
           repo-token: ${{ github.token }}
           tag: ${{ steps.version.outputs.tag }}
