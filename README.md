@@ -50,13 +50,13 @@ Console.WriteLine(mit?.LicenseText);
 The primary interface for all license queries. Lives at `OpenSourceInitiative.LicenseApi.Interfaces`.
 
 | Method                                 | Description                                                       |
-|-----------------------------------------|-------------------------------------------------------------------|
-| `GetAllLicensesAsyncEnumerable(token)`  | Streams the full catalog as `IAsyncEnumerable<OsiLicense?>`.       |
-| `GetByOsiIdAsync(id, token)`            | Fetches a single license by its OSI ID (e.g. `"mit"`).             |
-| `GetBySpdxIdAsync(id, token)`           | Filters by SPDX ID; supports `*` wildcards (`"GPL*"`, `"*-2.0"`).  |
-| `GetByNameAsync(name, token)`           | Filters by human-readable name.                                   |
-| `GetByKeywordAsync(keyword, token)`     | Filters by `OsiLicenseKeyword` enum value.                         |
-| `GetByStewardAsync(steward, token)`     | Filters by steward organization slug.                              |
+|----------------------------------------|-------------------------------------------------------------------|
+| `GetAllLicensesAsyncEnumerable(token)` | Streams the full catalog as `IAsyncEnumerable<OsiLicense?>`.      |
+| `GetByOsiIdAsync(id, token)`           | Fetches a single license by its OSI ID (e.g. `"mit"`).            |
+| `GetBySpdxIdAsync(id, token)`          | Filters by SPDX ID; supports `*` wildcards (`"GPL*"`, `"*-2.0"`). |
+| `GetByNameAsync(name, token)`          | Filters by human-readable name.                                   |
+| `GetByKeywordAsync(keyword, token)`    | Filters by `OsiLicenseKeyword` enum value.                        |
+| `GetByStewardAsync(steward, token)`    | Filters by steward organization slug.                             |
 
 Implements `IDisposable` and `IAsyncDisposable`.
 
@@ -82,12 +82,12 @@ If both steps fail (network error, unreachable page, markup without a `license-c
 
 `public sealed class` — configures the DI registration. Lives at `OpenSourceInitiative.LicenseApi.Options`.
 
-| Property                | Type                            | Default                        | Description                                            |
-|-------------------------|---------------------------------|---------------------------------|----------------------------------------------------------|
-| `BaseAddress`           | `Uri`                           | `https://opensource.org/api/`  | OSI API base URL.                                       |
-| `PrimaryHandlerFactory` | `Func<HttpMessageHandler>?`     | `null`                          | Injects a custom primary handler (useful for testing).  |
-| `UserAgent`             | `IList<ProductInfoHeaderValue>` | Assembly name + version         | Added to every request.                                 |
-| `HttpClientHandler`     | `HttpClientHandler`             | `AllowAutoRedirect = true`      | Used when no external `HttpClient` is supplied.         |
+| Property                | Type                            | Default                       | Description                                            |
+|-------------------------|---------------------------------|-------------------------------|--------------------------------------------------------|
+| `BaseAddress`           | `Uri`                           | `https://opensource.org/api/` | OSI API base URL.                                      |
+| `PrimaryHandlerFactory` | `Func<HttpMessageHandler>?`     | `null`                        | Injects a custom primary handler (useful for testing). |
+| `UserAgent`             | `IList<ProductInfoHeaderValue>` | Assembly name + version       | Added to every request.                                |
+| `HttpClientHandler`     | `HttpClientHandler`             | `AllowAutoRedirect = true`    | Used when no external `HttpClient` is supplied.        |
 
 ---
 
@@ -95,19 +95,19 @@ If both steps fail (network error, unreachable page, markup without a `license-c
 
 `public sealed record` — represents one OSI license entry. Lives at `OpenSourceInitiative.LicenseApi.Models`.
 
-| Property         | Type                                     | Notes                                                                       |
-|------------------|-------------------------------------------|-----------------------------------------------------------------------------|
-| `Id`             | `string`                                 | OSI-internal identifier (e.g. `"mit"`).                                     |
-| `Name`           | `string`                                 | Human-readable name.                                                        |
-| `SpdxId`         | `string?`                                | SPDX identifier (e.g. `"MIT"`).                                             |
-| `Version`        | `string?`                                | Optional version string.                                                    |
-| `SubmissionDate` | `DateTime?`                              | Parsed from `yyyyMMdd` via `CustomFormatDateTimeConverter`.                 |
-| `ApprovalDate`   | `DateTime?`                              | Parsed from `yyyyMMdd`.                                                     |
-| `Approved`       | `bool`                                   | OSI approval status.                                                        |
-| `Keywords`       | `IReadOnlyCollection<OsiLicenseKeyword>` | Deserialized via `OsiLicenseKeywordsConverter`; unknown tokens are ignored. |
-| `Stewards`       | `IReadOnlyCollection<string>`             | Steward organization slugs.                                                 |
-| `Links`          | `OsiLicenseLinks`                         | HAL-style `_links` object.                                                 |
-| `LicenseText`    | `string?`                                 | Extracted plain text — not part of the API payload, populated by the client after fetching. Empty string if scraping failed. Mutable, so you can set it yourself when constructing an `OsiLicense` by hand (e.g. in tests). |
+| Property         | Type                                     | Notes                                                                                                                                                                                                                       |
+|------------------|------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Id`             | `string`                                 | OSI-internal identifier (e.g. `"mit"`).                                                                                                                                                                                     |
+| `Name`           | `string`                                 | Human-readable name.                                                                                                                                                                                                        |
+| `SpdxId`         | `string?`                                | SPDX identifier (e.g. `"MIT"`).                                                                                                                                                                                             |
+| `Version`        | `string?`                                | Optional version string.                                                                                                                                                                                                    |
+| `SubmissionDate` | `DateTime?`                              | Parsed from `yyyyMMdd` via `CustomFormatDateTimeConverter`.                                                                                                                                                                 |
+| `ApprovalDate`   | `DateTime?`                              | Parsed from `yyyyMMdd`.                                                                                                                                                                                                     |
+| `Approved`       | `bool`                                   | OSI approval status.                                                                                                                                                                                                        |
+| `Keywords`       | `IReadOnlyCollection<OsiLicenseKeyword>` | Deserialized via `OsiLicenseKeywordsConverter`; unknown tokens are ignored.                                                                                                                                                 |
+| `Stewards`       | `IReadOnlyCollection<string>`            | Steward organization slugs.                                                                                                                                                                                                 |
+| `Links`          | `OsiLicenseLinks`                        | HAL-style `_links` object.                                                                                                                                                                                                  |
+| `LicenseText`    | `string?`                                | Extracted plain text — not part of the API payload, populated by the client after fetching. Empty string if scraping failed. Mutable, so you can set it yourself when constructing an `OsiLicense` by hand (e.g. in tests). |
 
 `OsiLicenseExtensions` adds `license.GetLicenseText(httpClient, token)` and `license.GetAndSetLicenseText(httpClient, token)` for re-fetching or backfilling the text on an existing instance.
 
@@ -154,6 +154,6 @@ Serializes to/from the OSI API string tokens (e.g. `popular-strong-community`) v
 ## Target frameworks
 
 | TFM              | Notes                                                                                                                           |
-|------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| `net10.0`        | Full feature set. Uses `ValueTask.CompletedTask`, `MediaTypeNames`, `ReadAsStreamAsync(token)`, C# 14 extension blocks.           |
-| `netstandard2.0` | Compatible subset. `#if !NETSTANDARD2_0` guards cover API surface differences. `System.Text.Json` pulled as a NuGet dependency.  |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `net10.0`        | Full feature set. Uses `ValueTask.CompletedTask`, `MediaTypeNames`, `ReadAsStreamAsync(token)`, C# 14 extension blocks.         |
+| `netstandard2.0` | Compatible subset. `#if !NETSTANDARD2_0` guards cover API surface differences. `System.Text.Json` pulled as a NuGet dependency. |
