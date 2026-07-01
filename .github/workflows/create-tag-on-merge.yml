@@ -25,7 +25,7 @@ jobs:
         id: version
         with:
           file-name: Directory.Build.props
-          
+      
       - name: Create tag
         uses: tvdias/github-tagger@v0.0.2
         with: 
