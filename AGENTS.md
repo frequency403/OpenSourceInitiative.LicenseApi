@@ -109,6 +109,10 @@ dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
 - Merging into `main` creates tag `vX.Y.Z` (`create-tag-on-merge.yml`), which triggers
   `publish.yml`: build, pack, push to NuGet.org via OIDC, and create a GitHub release.
   The tag must match `<Version>`.
+- `claude-review.yml` reviews every same-repository, non-draft PR with Claude. Findings become
+  inline comments (which must be resolved before merging). If Claude reports no blocking finding,
+  a separate step approves the PR as `github-actions[bot]`; Claude itself never holds approve rights.
+  Every push dismisses the approval and triggers a fresh review.
 - SemVer: breaking public API → major; new features or dependency updates → minor; fixes → patch.
 - Version format must be plain `MAJOR.MINOR.PATCH` (no suffix) — the workflows reject anything else.
 - Commit messages: conventional style appreciated (`chore(deps): ...`, `feat: ...`, `fix: ...`).
