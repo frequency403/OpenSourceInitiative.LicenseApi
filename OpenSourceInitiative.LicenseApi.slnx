@@ -4,6 +4,7 @@
     <Folder Name="/Continuous Integration/">
         <File Path=".github\actions\get-version\action.yml" />
         <File Path=".github\workflows\ci.yml" />
+        <File Path=".github\workflows\claude-review.yml" />
         <File Path=".github\workflows\codeql.yml" />
         <File Path=".github\workflows\create-tag-on-merge.yml" />
         <File Path=".github\workflows\publish.yml" />
