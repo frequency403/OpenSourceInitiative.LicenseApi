@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - "v*.*.*"
+  # Started by create-tag-on-merge.yml on the new tag: a tag created with GITHUB_TOKEN does not
+  # trigger the push event above, but workflow_dispatch is exempt from that rule.
+  # Manual use: gh workflow run publish.yml --ref vX.Y.Z
+  workflow_dispatch:
 
 permissions:
   contents: write
