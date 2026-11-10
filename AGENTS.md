@@ -84,6 +84,12 @@ dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
 - Unit tests must not hit the network — use `StubHttpMessageHandler`. Anything that needs the
   real API goes in `Integration/` with `[OsiApiAvailableFact]`.
 - Add or update tests with every behavioural change; keep coverage above the CI threshold.
+- The test project sets `IsTestingPlatformApplication=false`: xunit.v3 4.x defaults to
+  Microsoft.Testing.Platform, which refuses the VSTest-based `dotnet test` on the .NET 10 SDK.
+  Keeping VSTest lets `coverlet.msbuild` and the `/p:CollectCoverage=...` CI command line work.
+  Don't remove it without migrating CI coverage to an MTP extension.
+- In Git Bash, `/p:` switches get mangled by path conversion — prefix commands with
+  `MSYS_NO_PATHCONV=1` or use PowerShell.
 
 ## Dependencies
 
