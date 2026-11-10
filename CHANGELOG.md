@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Improved discoverability: README gained feature list, installation instructions, links to the OSI API announcement and a trademark disclaimer; NuGet description, title and tags reworked
 - Added community health files: Code of Conduct, Contributing, Security, Support, issue/PR templates
 - Added Dependabot and CodeQL workflows
 - Fixed CI workflow matrix syntax and added badges/links to README
