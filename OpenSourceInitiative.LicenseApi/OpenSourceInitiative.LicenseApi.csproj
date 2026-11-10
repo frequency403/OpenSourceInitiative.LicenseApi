@@ -4,8 +4,10 @@
     <Nullable>enable</Nullable>
     <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
-    <Description>Lightweight client for the Open Source Initiative (OSI) License API. Fetches OSI license catalog and extracts human-readable license text from the HTML pages. Designed to be resilient and allocation-friendly. Multi-targets net10.0 and netstandard2.0.</Description>
-    <PackageTags>OSI;Open Source Initiative;License;SPDX;License API;OpenSource</PackageTags>
+    <Title>OSI License API client for .NET</Title>
+    <Description>Community-maintained .NET client for the Open Source Initiative (OSI) License API, the canonical catalog of OSI Approved Licenses. List, search and filter licenses by SPDX ID (with wildcards), name, keyword or steward, and retrieve the human-readable license text. Async, dependency-injection friendly (IHttpClientFactory), multi-targets net10.0 and netstandard2.0. Not affiliated with or endorsed by the Open Source Initiative.</Description>
+    <PackageTags>osi;opensource;open-source;open-source-initiative;osi-approved;license;licenses;licensing;license-api;license-text;spdx;compliance;api-client;rest-client;dotnet;netstandard</PackageTags>
+    <PackageReleaseNotes>https://github.com/frequency403/OpenSourceInitiative.LicenseApi/releases</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" />
