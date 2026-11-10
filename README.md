@@ -1,7 +1,34 @@
 # OpenSourceInitiative.LicenseApi
-[![CI](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml/badge.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) ![NuGet Version](https://img.shields.io/nuget/v/OpenSourceInitiative.LicenseApi?style=flat)
+[![NuGet Version](https://img.shields.io/nuget/v/OpenSourceInitiative.LicenseApi?style=flat)](https://www.nuget.org/packages/OpenSourceInitiative.LicenseApi) [![NuGet Downloads](https://img.shields.io/nuget/dt/OpenSourceInitiative.LicenseApi?style=flat)](https://www.nuget.org/packages/OpenSourceInitiative.LicenseApi) [![CI](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml/badge.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/blob/main/LICENSE)
 
-A lightweight, multi-targeted (.NET 10 / netstandard2.0) client library for the [Open Source Initiative License API](https://opensource.org/api). Fetches the OSI license catalog, supports filtering by SPDX ID, name, keyword, and steward, and extracts human-readable license text from the OSI HTML pages. No caching layer — every call goes to the network; callers that want caching add their own decorator.
+**The .NET client for the [Open Source Initiative License API](https://opensource.org/api/license)** — list, search and filter the canonical catalog of OSI Approved Licenses® from C#, F# or any other .NET language, including the human-readable license text.
+
+A lightweight, multi-targeted (.NET 10 / netstandard2.0) library built on the [official OSI API](https://opensource.org/blog/introducing-the-new-api-for-osi-approved-licenses). It fetches the OSI license catalog, supports filtering by SPDX ID, name, keyword, and steward, and extracts human-readable license text from the OSI HTML pages. No caching layer — every call goes to the network; callers that want caching add their own decorator.
+
+## Features
+
+- List all OSI Approved Licenses®, streamed as `IAsyncEnumerable`
+- Look up a single license by its OSI ID (e.g. `mit`, `gpl-3-0`)
+- Filter by SPDX ID, including `*` wildcards (`GPL*`, `*-2.0`)
+- Search licenses by name
+- Filter by classification keyword via a strongly typed enum (e.g. `PopularStrongCommunity`)
+- Filter by steward organization (e.g. `eclipse-foundation`)
+- Full license metadata: version, submission and approval dates, stewards, keywords, links
+- Human-readable license text for every license — something the API payload itself does not contain
+- First-class dependency injection support (`IHttpClientFactory`, `ILogger`), or usable standalone with a single `new OsiClient()`
+- Runs on .NET 10 and on every `netstandard2.0`-compatible runtime (.NET Framework, .NET Core, Mono, Unity)
+
+## Installation
+
+```bash
+dotnet add package OpenSourceInitiative.LicenseApi
+```
+
+Or as a package reference:
+
+```xml
+<PackageReference Include="OpenSourceInitiative.LicenseApi" Version="3.*" />
+```
 
 ---
 
@@ -157,3 +184,27 @@ Serializes to/from the OSI API string tokens (e.g. `popular-strong-community`) v
 |------------------|---------------------------------------------------------------------------------------------------------------------------------|
 | `net10.0`        | Full feature set. Uses `ValueTask.CompletedTask`, `MediaTypeNames`, `ReadAsStreamAsync(token)`, C# 14 extension blocks.         |
 | `netstandard2.0` | Compatible subset. `#if !NETSTANDARD2_0` guards cover API surface differences. `System.Text.Json` pulled as a NuGet dependency. |
+
+---
+
+## About the OSI License API
+
+This library talks to the public, free-to-use API that the Open Source Initiative serves from `https://opensource.org/api`.
+
+- Announcement: [Introducing the new API for OSI Approved Licenses®](https://opensource.org/blog/introducing-the-new-api-for-osi-approved-licenses)
+- API documentation and discussion: [OSI Discuss thread](https://discuss.opensource.org/t/introducing-the-new-api-for-osi-approved-licenses/1169)
+- License catalog: [opensource.org/licenses](https://opensource.org/licenses)
+
+## Contributing and support
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/blob/main/CONTRIBUTING.md) and [SUPPORT.md](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/blob/main/SUPPORT.md). Changes are listed in the [GitHub releases](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/releases).
+
+## License
+
+Licensed under the [MIT License](https://github.com/frequency403/OpenSourceInitiative.LicenseApi/blob/main/LICENSE) — itself an [OSI Approved License®](https://opensource.org/license/mit).
+
+Copyright © 2025 Oliver Schantz and Contributors.
+
+## Disclaimer
+
+This is an independent community project. It is not affiliated with, sponsored by, or endorsed by the Open Source Initiative. "Open Source Initiative" and "OSI Approved License" are trademarks of the Open Source Initiative; they are used here only to describe the API this library consumes.
