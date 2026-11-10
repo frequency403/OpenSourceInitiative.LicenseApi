@@ -7,6 +7,7 @@ on:
       - main
 permissions:
   contents: write
+  actions: write # dispatch publish.yml
 
 jobs:
   create-and-push-tag:
@@ -32,3 +33,11 @@ jobs:
           commit-sha: ${{ github.event.pull_request.merge_commit_sha }}
           repo-token: ${{ github.token }}
           tag: ${{ steps.version.outputs.tag }}
+
+      # Tags created with GITHUB_TOKEN don't trigger publish.yml's push event, so dispatch it
+      # explicitly on the new tag (workflow_dispatch is exempt from that restriction).
+      - name: Start publish workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh workflow run publish.yml --repo "${GITHUB_REPOSITORY}" --ref "${TAG}"

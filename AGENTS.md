@@ -106,9 +106,11 @@ dotnet test -c Release /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
 - `main` is the release branch. A PR `develop → main` (often via `release/vX.Y.Z`) triggers
   `version-guard.yml`, which fails unless `<Version>` in `Directory.Build.props` is **greater**
   than on `main`.
-- Merging into `main` creates tag `vX.Y.Z` (`create-tag-on-merge.yml`), which triggers
-  `publish.yml`: build, pack, push to NuGet.org via OIDC, and create a GitHub release.
-  The tag must match `<Version>`.
+- Merging into `main` creates tag `vX.Y.Z` (`create-tag-on-merge.yml`) and then dispatches
+  `publish.yml` on that tag: build, pack, push to NuGet.org via OIDC, and create a GitHub release.
+  The tag must match `<Version>`. The explicit dispatch is needed because a tag created with
+  `GITHUB_TOKEN` does not trigger `push` workflows. To republish manually:
+  `gh workflow run publish.yml --ref vX.Y.Z`.
 - `claude-review.yml` reviews every same-repository, non-draft PR with Claude. Findings become
   inline comments (which must be resolved before merging). If Claude reports no blocking finding,
   a separate step approves the PR as `github-actions[bot]`; Claude itself never holds approve rights.
